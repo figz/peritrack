@@ -1,0 +1,161 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum EntryPeriod {
+  morning
+  evening
+}
+
+enum MedicationType {
+  medication
+  hrt
+  supplement
+  other
+}
+
+enum EventCategory {
+  stressor
+  nutrition
+  exercise
+  travel
+  illness
+  other
+}
+
+enum SpottingColor {
+  pale_pink
+  red
+  brown
+}
+
+model LogEntry {
+  id            String      @id @default(uuid())
+  entryDate     DateTime    @db.Date @map("entry_date")
+  entryPeriod   EntryPeriod @map("entry_period")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+  notes         String?
+  weightLbs     Decimal?    @db.Decimal(5, 1) @map("weight_lbs")
+
+  symptomScores    SymptomScore[]
+  sideEffectScores SideEffectScore[]
+  periodLog        PeriodLog?
+  biometrics       Biometric[]
+
+  @@unique([entryDate, entryPeriod])
+  @@map("log_entries")
+}
+
+model SymptomScore {
+  id         String   @id @default(uuid())
+  logEntryId String   @map("log_entry_id")
+  symptomKey String   @map("symptom_key") @db.VarChar(64)
+  score      Int      @db.SmallInt
+
+  logEntry   LogEntry @relation(fields: [logEntryId], references: [id], onDelete: Cascade)
+
+  @@map("symptom_scores")
+}
+
+model SideEffectScore {
+  id            String   @id @default(uuid())
+  logEntryId    String   @map("log_entry_id")
+  sideEffectKey String   @map("side_effect_key") @db.VarChar(64)
+  score         Int      @db.SmallInt
+
+  logEntry      LogEntry @relation(fields: [logEntryId], references: [id], onDelete: Cascade)
+
+  @@map("side_effect_scores")
+}
+
+model PeriodLog {
+  id            String         @id @default(uuid())
+  logEntryId    String         @unique @map("log_entry_id")
+  isPresent     Boolean        @default(false) @map("is_present")
+  flowSeverity  Int?           @db.SmallInt @map("flow_severity")
+  spotting      Boolean        @default(false)
+  spottingColor SpottingColor? @map("spotting_color")
+
+  logEntry      LogEntry       @relation(fields: [logEntryId], references: [id], onDelete: Cascade)
+
+  @@map("period_logs")
+}
+
+model Biometric {
+  id          String   @id @default(uuid())
+  logEntryId  String   @map("log_entry_id")
+  metricKey   String   @map("metric_key") @db.VarChar(64)
+  metricValue Decimal? @db.Decimal(8, 2) @map("metric_value")
+  metricUnit  String?  @map("metric_unit") @db.VarChar(32)
+
+  logEntry    LogEntry @relation(fields: [logEntryId], references: [id], onDelete: Cascade)
+
+  @@map("biometrics")
+}
+
+model Medication {
+  id        String         @id @default(uuid())
+  name      String         @db.VarChar(256)
+  type      MedicationType
+  dose      String?        @db.VarChar(128)
+  frequency String?        @db.VarChar(128)
+  notes     String?
+  isActive  Boolean        @default(true) @map("is_active")
+  createdAt DateTime       @default(now()) @map("created_at")
+
+  periods   MedicationPeriod[]
+
+  @@map("medications")
+}
+
+model MedicationPeriod {
+  id           String     @id @default(uuid())
+  medicationId String     @map("medication_id")
+  startDate    DateTime   @db.Date @map("start_date")
+  endDate      DateTime?  @db.Date @map("end_date")
+  doseAtStart  String?    @db.VarChar(128) @map("dose_at_start")
+  changeReason String?    @map("change_reason")
+  notes        String?
+  createdAt    DateTime   @default(now()) @map("created_at")
+
+  medication   Medication @relation(fields: [medicationId], references: [id])
+
+  @@map("medication_periods")
+}
+
+model LifeEvent {
+  id          String        @id @default(uuid())
+  eventDate   DateTime      @db.Date @map("event_date")
+  category    EventCategory
+  title       String        @db.VarChar(256)
+  description String?
+  createdAt   DateTime      @default(now()) @map("created_at")
+
+  @@map("life_events")
+}
+
+model SymptomDefinition {
+  key       String  @id @db.VarChar(64)
+  label     String  @db.VarChar(128)
+  category  String? @db.VarChar(64)
+  isActive  Boolean @default(true) @map("is_active")
+  sortOrder Int?    @map("sort_order")
+
+  @@map("symptom_definitions")
+}
+
+model SideEffectDefinition {
+  key       String  @id @db.VarChar(64)
+  label     String  @db.VarChar(128)
+  category  String? @db.VarChar(64)
+  isActive  Boolean @default(true) @map("is_active")
+  sortOrder Int?    @map("sort_order")
+
+  @@map("side_effect_definitions")
+}
