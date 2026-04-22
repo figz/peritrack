@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { Button } from '@/components/ui/button'
@@ -109,13 +109,8 @@ const DEFAULT_BIOMETRICS: BiometricEntry[] = [
 
 export function CheckInForm() {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const paramPeriod = searchParams.get('period') as 'morning' | 'evening' | null
 
   const [date, setDate] = useState(() => format(new Date(), 'yyyy-MM-dd'))
-  const [period, setPeriod] = useState<'morning' | 'evening'>(
-    paramPeriod ?? (new Date().getHours() < 12 ? 'morning' : 'evening')
-  )
   const [symptoms, setSymptoms] = useState<SymptomDef[]>([])
   const [sideEffects, setSideEffects] = useState<SymptomDef[]>([])
   const [symptomScores, setSymptomScores] = useState<Record<string, number>>({})
@@ -124,12 +119,17 @@ export function CheckInForm() {
   const [flowSeverity, setFlowSeverity] = useState(0)
   const [spotting, setSpotting] = useState(false)
   const [spottingColor, setSpottingColor] = useState<'pale_pink' | 'red' | 'brown' | ''>('')
+  const [hydration, setHydration] = useState(0)
+  const [nutritionQuality, setNutritionQuality] = useState(0)
+  const [dailyWalk, setDailyWalk] = useState<boolean | null>(null)
+  const [ptExercises, setPtExercises] = useState<boolean | null>(null)
+  const [otherExercise, setOtherExercise] = useState<boolean | null>(null)
   const [biometrics, setBiometrics] = useState<BiometricEntry[]>(DEFAULT_BIOMETRICS)
   const [weight, setWeight] = useState('')
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
   const [existingId, setExistingId] = useState<string | null>(null)
-  const draftKey = `peritrack-draft-${date}-${period}`
+  const draftKey = `peritrack-draft-${date}`
   const autoSaveRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
@@ -141,10 +141,9 @@ export function CheckInForm() {
       })
   }, [])
 
-  // Load existing or draft
   useEffect(() => {
     const loadEntry = async () => {
-      const res = await fetch(`/api/log?from=${date}&to=${date}&period=${period}&limit=1`)
+      const res = await fetch(`/api/log?from=${date}&to=${date}&limit=1`)
       const data = await res.json()
       if (data.entries?.length > 0) {
         const entry = data.entries[0]
@@ -157,6 +156,11 @@ export function CheckInForm() {
         setSideEffectScores(ses)
         setNotes(entry.notes ?? '')
         setWeight(entry.weightLbs?.toString() ?? '')
+        setHydration(entry.hydration ?? 0)
+        setNutritionQuality(entry.nutritionQuality ?? 0)
+        setDailyWalk(entry.dailyWalk ?? null)
+        setPtExercises(entry.ptExercises ?? null)
+        setOtherExercise(entry.otherExercise ?? null)
         if (entry.periodLog) {
           setPeriodPresent(entry.periodLog.isPresent)
           setFlowSeverity(entry.periodLog.flowSeverity ?? 0)
@@ -171,7 +175,6 @@ export function CheckInForm() {
         setBiometrics(bio)
         return
       }
-      // Load draft
       try {
         const draft = localStorage.getItem(draftKey)
         if (draft) {
@@ -180,6 +183,11 @@ export function CheckInForm() {
           setSideEffectScores(d.sideEffectScores ?? {})
           setNotes(d.notes ?? '')
           setWeight(d.weight ?? '')
+          setHydration(d.hydration ?? 0)
+          setNutritionQuality(d.nutritionQuality ?? 0)
+          setDailyWalk(d.dailyWalk ?? null)
+          setPtExercises(d.ptExercises ?? null)
+          setOtherExercise(d.otherExercise ?? null)
           setPeriodPresent(d.periodPresent ?? false)
           setFlowSeverity(d.flowSeverity ?? 0)
           setSpotting(d.spotting ?? false)
@@ -189,13 +197,17 @@ export function CheckInForm() {
       } catch {}
     }
     loadEntry()
-  }, [date, period, draftKey])
+  }, [date, draftKey])
 
   const saveDraft = useCallback(() => {
     try {
-      localStorage.setItem(draftKey, JSON.stringify({ symptomScores, sideEffectScores, notes, weight, periodPresent, flowSeverity, spotting, spottingColor, biometrics }))
+      localStorage.setItem(draftKey, JSON.stringify({
+        symptomScores, sideEffectScores, notes, weight,
+        hydration, nutritionQuality, dailyWalk, ptExercises, otherExercise,
+        periodPresent, flowSeverity, spotting, spottingColor, biometrics,
+      }))
     } catch {}
-  }, [draftKey, symptomScores, sideEffectScores, notes, weight, periodPresent, flowSeverity, spotting, spottingColor, biometrics])
+  }, [draftKey, symptomScores, sideEffectScores, notes, weight, hydration, nutritionQuality, dailyWalk, ptExercises, otherExercise, periodPresent, flowSeverity, spotting, spottingColor, biometrics])
 
   useEffect(() => {
     autoSaveRef.current = setInterval(saveDraft, 30000)
@@ -212,14 +224,18 @@ export function CheckInForm() {
     return groups
   }
 
-  async function handleSave(andThen?: 'close' | 'other') {
+  async function handleSave(andClose = false) {
     setSaving(true)
     try {
       const payload = {
         entryDate: date,
-        entryPeriod: period,
         notes: notes || null,
         weightLbs: weight || null,
+        hydration: hydration > 0 ? hydration : null,
+        nutritionQuality: nutritionQuality > 0 ? nutritionQuality : null,
+        dailyWalk,
+        ptExercises,
+        otherExercise,
         symptoms: Object.entries(symptomScores).map(([key, score]) => ({ key, score })),
         sideEffects: Object.entries(sideEffectScores).map(([key, score]) => ({ key, score })),
         periodLog: (periodPresent || spotting) ? {
@@ -236,12 +252,7 @@ export function CheckInForm() {
 
       localStorage.removeItem(draftKey)
       toast.success('Check-in saved!')
-
-      if (andThen === 'close') router.push('/')
-      else if (andThen === 'other') {
-        const other = period === 'morning' ? 'evening' : 'morning'
-        router.push(`/log/new?period=${other}&date=${date}`)
-      }
+      if (andClose) router.push('/')
     } catch {
       toast.error('Failed to save. Please try again.')
     } finally {
@@ -252,6 +263,28 @@ export function CheckInForm() {
   const symptomGroups = groupByCategory(symptoms)
   const sideEffectGroups = groupByCategory(sideEffects)
 
+  function YesNoToggle({ value, onChange, label }: { value: boolean | null; onChange: (v: boolean | null) => void; label: string }) {
+    return (
+      <div className="flex gap-2" role="group" aria-label={label}>
+        {([true, false] as const).map((v) => (
+          <button
+            key={String(v)}
+            type="button"
+            onClick={() => onChange(value === v ? null : v)}
+            aria-pressed={value === v}
+            className={`min-h-[44px] px-4 py-2 rounded-lg border text-sm font-medium transition-all ${
+              value === v
+                ? v ? 'bg-green-50 border-green-300 text-green-700' : 'bg-gray-100 border-gray-300 text-gray-600'
+                : 'bg-white border-gray-200 text-gray-400 hover:border-gray-300'
+            }`}
+          >
+            {v ? 'Yes' : 'No'}
+          </button>
+        ))}
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6 max-w-2xl mx-auto pb-20">
       <div className="flex items-center justify-between">
@@ -259,35 +292,12 @@ export function CheckInForm() {
         {existingId && <Badge variant="secondary" className="bg-blue-50 text-blue-700">Editing existing entry</Badge>}
       </div>
 
-      {/* Date & Period */}
+      {/* Date */}
       <Card>
-        <CardContent className="pt-6 space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <Label htmlFor="entry-date">Date</Label>
-              <Input id="entry-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} className="min-h-[44px]" />
-            </div>
-            <div className="space-y-1">
-              <Label>Time of Day</Label>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setPeriod('morning')}
-                  aria-pressed={period === 'morning'}
-                  className={`flex-1 min-h-[44px] rounded-lg border text-sm font-medium transition-all ${period === 'morning' ? 'bg-amber-50 border-amber-300 text-amber-700' : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'}`}
-                >
-                  🌅 Morning
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPeriod('evening')}
-                  aria-pressed={period === 'evening'}
-                  className={`flex-1 min-h-[44px] rounded-lg border text-sm font-medium transition-all ${period === 'evening' ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'}`}
-                >
-                  🌙 Evening
-                </button>
-              </div>
-            </div>
+        <CardContent className="pt-6">
+          <div className="space-y-1 max-w-[200px]">
+            <Label htmlFor="entry-date">Date</Label>
+            <Input id="entry-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} className="min-h-[44px]" />
           </div>
         </CardContent>
       </Card>
@@ -331,6 +341,36 @@ export function CheckInForm() {
           </CardContent>
         </Card>
       )}
+
+      {/* Daily Wellness */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Daily Wellness</CardTitle>
+          <p className="text-xs text-gray-500">0 = None / Poor, 3 = Excellent</p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between min-h-[44px]">
+            <Label className="text-sm">Hydration</Label>
+            <ScoreToggle value={hydration} onChange={setHydration} label="Hydration" />
+          </div>
+          <div className="flex items-center justify-between min-h-[44px]">
+            <Label className="text-sm">Nutrition Quality</Label>
+            <ScoreToggle value={nutritionQuality} onChange={setNutritionQuality} label="Nutrition Quality" />
+          </div>
+          <div className="flex items-center justify-between min-h-[44px]">
+            <Label className="text-sm">Daily Walk</Label>
+            <YesNoToggle value={dailyWalk} onChange={setDailyWalk} label="Daily Walk" />
+          </div>
+          <div className="flex items-center justify-between min-h-[44px]">
+            <Label className="text-sm">PT Exercises</Label>
+            <YesNoToggle value={ptExercises} onChange={setPtExercises} label="PT Exercises" />
+          </div>
+          <div className="flex items-center justify-between min-h-[44px]">
+            <Label className="text-sm">Other Exercise</Label>
+            <YesNoToggle value={otherExercise} onChange={setOtherExercise} label="Other Exercise" />
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Period Tracker */}
       <Card id="period-section">
@@ -457,7 +497,7 @@ export function CheckInForm() {
       <div className="flex gap-3 sticky bottom-4">
         <Button
           type="button"
-          onClick={() => handleSave('close')}
+          onClick={() => handleSave(true)}
           disabled={saving}
           className="flex-1 bg-rose-600 hover:bg-rose-700 min-h-[48px]"
         >
@@ -467,11 +507,11 @@ export function CheckInForm() {
         <Button
           type="button"
           variant="outline"
-          onClick={() => handleSave('other')}
+          onClick={() => handleSave(false)}
           disabled={saving}
           className="flex-1 min-h-[48px]"
         >
-          Save &amp; Log {period === 'morning' ? 'Evening' : 'Morning'}
+          Save
         </Button>
       </div>
     </div>

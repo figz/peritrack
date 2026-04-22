@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { EntryPeriod } from '@prisma/client'
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
@@ -13,7 +12,6 @@ export async function GET(req: NextRequest) {
   const limit = parseInt(searchParams.get('limit') ?? '20')
   const from = searchParams.get('from')
   const to = searchParams.get('to')
-  const period = searchParams.get('period') as EntryPeriod | null
 
   const where: Record<string, unknown> = {}
   if (from || to) {
@@ -21,7 +19,6 @@ export async function GET(req: NextRequest) {
     if (from) (where.entryDate as Record<string, unknown>).gte = new Date(from)
     if (to) (where.entryDate as Record<string, unknown>).lte = new Date(to)
   }
-  if (period) where.entryPeriod = period
 
   const [entries, total] = await Promise.all([
     prisma.logEntry.findMany({
@@ -32,7 +29,7 @@ export async function GET(req: NextRequest) {
         periodLog: true,
         biometrics: true,
       },
-      orderBy: [{ entryDate: 'desc' }, { entryPeriod: 'asc' }],
+      orderBy: { entryDate: 'desc' },
       skip: (page - 1) * limit,
       take: limit,
     }),
@@ -47,14 +44,13 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
-  const { entryDate, entryPeriod, notes, weightLbs, symptoms, sideEffects, periodLog, biometrics } = body
+  const { entryDate, notes, weightLbs, hydration, nutritionQuality, dailyWalk, ptExercises, otherExercise, symptoms, sideEffects, periodLog, biometrics } = body
 
   const existing = await prisma.logEntry.findUnique({
-    where: { entryDate_entryPeriod: { entryDate: new Date(entryDate), entryPeriod } },
+    where: { entryDate: new Date(entryDate) },
   })
 
   if (existing) {
-    // Update existing entry
     const updated = await prisma.$transaction(async (tx) => {
       await tx.symptomScore.deleteMany({ where: { logEntryId: existing.id } })
       await tx.sideEffectScore.deleteMany({ where: { logEntryId: existing.id } })
@@ -66,6 +62,11 @@ export async function POST(req: NextRequest) {
         data: {
           notes,
           weightLbs: weightLbs ? parseFloat(weightLbs) : null,
+          hydration: hydration != null ? parseInt(hydration) : null,
+          nutritionQuality: nutritionQuality != null ? parseInt(nutritionQuality) : null,
+          dailyWalk: dailyWalk ?? null,
+          ptExercises: ptExercises ?? null,
+          otherExercise: otherExercise ?? null,
           symptomScores: { create: (symptoms ?? []).map((s: { key: string; score: number }) => ({ symptomKey: s.key, score: s.score })) },
           sideEffectScores: { create: (sideEffects ?? []).map((s: { key: string; score: number }) => ({ sideEffectKey: s.key, score: s.score })) },
           periodLog: periodLog ? { create: periodLog } : undefined,
@@ -80,9 +81,13 @@ export async function POST(req: NextRequest) {
   const entry = await prisma.logEntry.create({
     data: {
       entryDate: new Date(entryDate),
-      entryPeriod,
       notes,
       weightLbs: weightLbs ? parseFloat(weightLbs) : null,
+      hydration: hydration != null ? parseInt(hydration) : null,
+      nutritionQuality: nutritionQuality != null ? parseInt(nutritionQuality) : null,
+      dailyWalk: dailyWalk ?? null,
+      ptExercises: ptExercises ?? null,
+      otherExercise: otherExercise ?? null,
       symptomScores: { create: (symptoms ?? []).map((s: { key: string; score: number }) => ({ symptomKey: s.key, score: s.score })) },
       sideEffectScores: { create: (sideEffects ?? []).map((s: { key: string; score: number }) => ({ sideEffectKey: s.key, score: s.score })) },
       periodLog: periodLog ? { create: periodLog } : undefined,

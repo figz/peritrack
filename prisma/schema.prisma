@@ -7,11 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum EntryPeriod {
-  morning
-  evening
-}
-
 enum MedicationType {
   medication
   hrt
@@ -35,20 +30,24 @@ enum SpottingColor {
 }
 
 model LogEntry {
-  id            String      @id @default(uuid())
-  entryDate     DateTime    @db.Date @map("entry_date")
-  entryPeriod   EntryPeriod @map("entry_period")
-  createdAt     DateTime    @default(now()) @map("created_at")
-  updatedAt     DateTime    @updatedAt @map("updated_at")
-  notes         String?
-  weightLbs     Decimal?    @db.Decimal(5, 1) @map("weight_lbs")
+  id               String   @id @default(uuid())
+  entryDate        DateTime @db.Date @map("entry_date")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+  notes            String?
+  weightLbs        Decimal? @db.Decimal(5, 1) @map("weight_lbs")
+  hydration        Int?     @db.SmallInt
+  nutritionQuality Int?     @db.SmallInt @map("nutrition_quality")
+  dailyWalk        Boolean? @map("daily_walk")
+  ptExercises      Boolean? @map("pt_exercises")
+  otherExercise    Boolean? @map("other_exercise")
 
   symptomScores    SymptomScore[]
   sideEffectScores SideEffectScore[]
   periodLog        PeriodLog?
   biometrics       Biometric[]
 
-  @@unique([entryDate, entryPeriod])
+  @@unique([entryDate])
   @@map("log_entries")
 }
 

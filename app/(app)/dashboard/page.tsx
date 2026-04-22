@@ -6,10 +6,10 @@ import { format, isToday } from 'date-fns'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { PlusCircle, Sun, Moon, Droplets, Scale, Pill, Activity } from 'lucide-react'
+import { PlusCircle, CheckCircle2, Droplets, Scale, Pill, Activity, ClipboardList } from 'lucide-react'
 
 interface DashboardData {
-  today: { morning: boolean; evening: boolean }
+  today: { logged: boolean }
   topSymptoms: { key: string; label: string; avg: number }[]
   activeMedications: { id: string; name: string; type: string; dose: string | null }[]
   lastPeriodDate: string | null
@@ -17,7 +17,6 @@ interface DashboardData {
   recentEntries: {
     id: string
     entryDate: string
-    entryPeriod: string
     notes: string | null
     symptomScores: { symptomKey: string; score: number }[]
   }[]
@@ -42,50 +41,39 @@ export default function DashboardPage() {
   if (!data) return <div className="text-red-500 p-8">Failed to load dashboard.</div>
 
   const now = new Date()
-  const isMorning = now.getHours() < 12
-  const quickLogPeriod = isMorning ? 'morning' : 'evening'
-  const quickLogDone = isMorning ? data.today.morning : data.today.evening
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Good {isMorning ? 'morning' : 'evening'}</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Hello, Michelle</h1>
           <p className="text-gray-500 text-sm mt-0.5">{format(now, 'EEEE, MMMM d, yyyy')}</p>
         </div>
         <Button asChild className="bg-rose-600 hover:bg-rose-700 min-h-[44px]">
-          <Link href={`/log/new?period=${quickLogPeriod}`}>
+          <Link href="/log/new">
             <PlusCircle className="w-4 h-4 mr-2" aria-hidden />
-            {quickLogDone ? 'Edit ' : ''}{isMorning ? 'Morning' : 'Evening'} Check-In
+            {data.today.logged ? 'Update' : 'Log'} Today
           </Link>
         </Button>
       </div>
 
       {/* Today's status */}
-      <div className="grid grid-cols-2 gap-4">
-        <Card className={data.today.morning ? 'border-green-200 bg-green-50' : ''}>
-          <CardContent className="flex items-center gap-3 p-4">
-            <Sun className={`w-6 h-6 shrink-0 ${data.today.morning ? 'text-green-600' : 'text-gray-300'}`} aria-hidden />
-            <div>
-              <p className="font-medium text-sm">Morning Check-In</p>
-              <p className={`text-xs ${data.today.morning ? 'text-green-600' : 'text-gray-400'}`}>
-                {data.today.morning ? 'Logged ✓' : 'Not logged'}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className={data.today.evening ? 'border-green-200 bg-green-50' : ''}>
-          <CardContent className="flex items-center gap-3 p-4">
-            <Moon className={`w-6 h-6 shrink-0 ${data.today.evening ? 'text-green-600' : 'text-gray-300'}`} aria-hidden />
-            <div>
-              <p className="font-medium text-sm">Evening Check-In</p>
-              <p className={`text-xs ${data.today.evening ? 'text-green-600' : 'text-gray-400'}`}>
-                {data.today.evening ? 'Logged ✓' : 'Not logged'}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <Card className={data.today.logged ? 'border-green-200 bg-green-50' : ''}>
+        <CardContent className="flex items-center gap-3 p-4">
+          <CheckCircle2 className={`w-6 h-6 shrink-0 ${data.today.logged ? 'text-green-600' : 'text-gray-300'}`} aria-hidden />
+          <div>
+            <p className="font-medium text-sm">Today&apos;s Check-In</p>
+            <p className={`text-xs ${data.today.logged ? 'text-green-600' : 'text-gray-400'}`}>
+              {data.today.logged ? 'Logged ✓ — tap to update anytime' : 'Not logged yet'}
+            </p>
+          </div>
+          {!data.today.logged && (
+            <Button asChild variant="outline" size="sm" className="ml-auto min-h-[44px]">
+              <Link href="/log/new">Log now</Link>
+            </Button>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {/* Top symptoms */}
@@ -173,10 +161,7 @@ export default function DashboardPage() {
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" asChild className="min-h-[44px]">
-            <Link href="/log/new?period=morning"><Sun className="w-4 h-4 mr-1" aria-hidden />Morning</Link>
-          </Button>
-          <Button variant="outline" size="sm" asChild className="min-h-[44px]">
-            <Link href="/log/new?period=evening"><Moon className="w-4 h-4 mr-1" aria-hidden />Evening</Link>
+            <Link href="/log/new"><ClipboardList className="w-4 h-4 mr-1" aria-hidden />Today&apos;s Log</Link>
           </Button>
           <Button variant="outline" size="sm" asChild className="min-h-[44px]">
             <Link href="/log/new?section=period"><Droplets className="w-4 h-4 mr-1" aria-hidden />Log Period</Link>
@@ -197,14 +182,11 @@ export default function DashboardPage() {
             {data.recentEntries.map((entry) => {
               const notable = entry.symptomScores.filter((s) => s.score >= 2)
               return (
-                <Link key={entry.id} href={`/log?entry=${entry.id}`} className="block">
+                <Link key={entry.id} href={`/log/new?date=${entry.entryDate}`} className="block">
                   <div className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 border border-gray-100">
-                    <div className="flex items-center gap-3">
-                      {entry.entryPeriod === 'morning' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-indigo-400" />}
-                      <div>
-                        <p className="text-sm font-medium">{format(new Date(entry.entryDate), 'MMM d')} — {entry.entryPeriod}</p>
-                        {entry.notes && <p className="text-xs text-gray-400 truncate max-w-[200px]">{entry.notes}</p>}
-                      </div>
+                    <div>
+                      <p className="text-sm font-medium">{format(new Date(entry.entryDate), 'EEEE, MMM d')}</p>
+                      {entry.notes && <p className="text-xs text-gray-400 truncate max-w-[200px]">{entry.notes}</p>}
                     </div>
                     <div className="flex flex-wrap gap-1 max-w-[160px] justify-end">
                       {notable.slice(0, 3).map((s) => (

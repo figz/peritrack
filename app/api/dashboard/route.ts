@@ -12,23 +12,19 @@ export async function GET() {
   const sevenDaysAgo = subDays(today, 7)
 
   const [
-    todayMorning,
-    todayEvening,
+    todayEntry,
     recentEntries,
     activeMedications,
     lastPeriodEntry,
     lastWeightEntry,
   ] = await Promise.all([
     prisma.logEntry.findUnique({
-      where: { entryDate_entryPeriod: { entryDate: today, entryPeriod: 'morning' } },
-    }),
-    prisma.logEntry.findUnique({
-      where: { entryDate_entryPeriod: { entryDate: today, entryPeriod: 'evening' } },
+      where: { entryDate: today },
     }),
     prisma.logEntry.findMany({
       where: { entryDate: { gte: sevenDaysAgo } },
       include: { symptomScores: true, sideEffectScores: true, periodLog: true },
-      orderBy: [{ entryDate: 'desc' }, { entryPeriod: 'asc' }],
+      orderBy: { entryDate: 'desc' },
       take: 5,
     }),
     prisma.medication.findMany({
@@ -48,13 +44,12 @@ export async function GET() {
     }),
   ])
 
-  // Calculate top 5 symptoms from last 7 days
   const last7Entries = await prisma.logEntry.findMany({
     where: { entryDate: { gte: sevenDaysAgo } },
     include: { symptomScores: true },
   })
 
-  const symptomTotals: Record<string, { total: number; count: number; label?: string }> = {}
+  const symptomTotals: Record<string, { total: number; count: number }> = {}
   for (const entry of last7Entries) {
     for (const s of entry.symptomScores) {
       if (!symptomTotals[s.symptomKey]) symptomTotals[s.symptomKey] = { total: 0, count: 0 }
@@ -73,7 +68,7 @@ export async function GET() {
     .slice(0, 5)
 
   return NextResponse.json({
-    today: { morning: !!todayMorning, evening: !!todayEvening },
+    today: { logged: !!todayEntry },
     topSymptoms,
     activeMedications,
     lastPeriodDate: lastPeriodEntry?.logEntry.entryDate ?? null,

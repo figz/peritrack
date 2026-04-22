@@ -22,13 +22,17 @@ export async function GET(req: NextRequest) {
   ])
 
   if (format === 'csv') {
-    const rows = ['Date,Period,Weight,Notes,Symptoms,Period Present,Flow Severity']
+    const rows = ['Date,Weight,Hydration,Nutrition Quality,Daily Walk,PT Exercises,Other Exercise,Notes,Symptoms,Period Present,Flow Severity']
     for (const entry of entries) {
       const sympStr = entry.symptomScores.filter((s) => s.score > 0).map((s) => `${s.symptomKey}:${s.score}`).join(';')
       rows.push([
         entry.entryDate.toISOString().split('T')[0],
-        entry.entryPeriod,
         entry.weightLbs ?? '',
+        entry.hydration ?? '',
+        entry.nutritionQuality ?? '',
+        entry.dailyWalk == null ? '' : entry.dailyWalk ? 'yes' : 'no',
+        entry.ptExercises == null ? '' : entry.ptExercises ? 'yes' : 'no',
+        entry.otherExercise == null ? '' : entry.otherExercise ? 'yes' : 'no',
         (entry.notes ?? '').replace(/,/g, ' '),
         sympStr,
         entry.periodLog?.isPresent ? 'yes' : 'no',
