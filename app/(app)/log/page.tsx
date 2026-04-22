@@ -10,6 +10,12 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { PlusCircle, ChevronLeft, ChevronRight, Eye } from 'lucide-react'
 
+// Parse a date-only string as local time to avoid UTC-to-local shift
+function localDate(s: string) {
+  const [y, m, d] = s.slice(0, 10).split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
 interface LogEntry {
   id: string
   entryDate: string
@@ -95,7 +101,7 @@ export default function LogHistoryPage() {
                     <div className="flex items-start justify-between gap-4">
                       <div className="min-w-0">
                         <p className="font-semibold text-gray-900">
-                          {format(new Date(entry.entryDate), 'EEEE, MMM d, yyyy')}
+                          {format(localDate(entry.entryDate), 'EEEE, MMM d, yyyy')}
                         </p>
                         <div className="flex flex-wrap gap-1 mt-1">
                           {notable.slice(0, 4).map((s) => (
@@ -122,7 +128,7 @@ export default function LogHistoryPage() {
                           <Badge className="bg-rose-100 text-rose-700 text-xs">Period</Badge>
                         )}
                         <Button variant="ghost" size="sm" asChild className="min-h-[44px]">
-                          <Link href={`/log/new?date=${entry.entryDate}`}>
+                          <Link href={`/log/new?date=${entry.entryDate.slice(0, 10)}`}>
                             <Eye className="w-4 h-4" aria-hidden />
                             <span className="sr-only">Edit entry</span>
                           </Link>

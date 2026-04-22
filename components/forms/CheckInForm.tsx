@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { Button } from '@/components/ui/button'
@@ -109,8 +109,9 @@ const DEFAULT_BIOMETRICS: BiometricEntry[] = [
 
 export function CheckInForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
 
-  const [date, setDate] = useState(() => format(new Date(), 'yyyy-MM-dd'))
+  const [date, setDate] = useState(() => searchParams.get('date') ?? format(new Date(), 'yyyy-MM-dd'))
   const [symptoms, setSymptoms] = useState<SymptomDef[]>([])
   const [sideEffects, setSideEffects] = useState<SymptomDef[]>([])
   const [symptomScores, setSymptomScores] = useState<Record<string, number>>({})
