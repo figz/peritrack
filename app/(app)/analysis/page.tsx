@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ArrowUp, ArrowDown, Minus, TrendingUp, TrendingDown, AlertTriangle } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { ArrowUp, ArrowDown, Minus, TrendingUp, TrendingDown, AlertTriangle, Brain, Loader2 } from 'lucide-react'
 
 interface MedImpactResult {
   medicationId: string
@@ -42,6 +43,31 @@ interface CorrelationResult {
   labels: Record<string, string>
 }
 
+interface RegressionPredictor {
+  name: string
+  key: string
+  coefficient: number
+  tStat: number
+  pValue: number
+  significant: boolean
+  interpretation: string
+}
+
+interface RegressionResult {
+  target: { key: string; label: string }
+  r2: number
+  adjustedR2: number
+  n: number
+  predictors: RegressionPredictor[]
+  symptoms: { key: string; label: string }[]
+}
+
+interface InsightsResult {
+  insights: string
+  generatedAt: string
+  dataRange: { days: number; entries: number }
+}
+
 function DirIcon({ dir }: { dir: string }) {
   if (dir === 'improved') return <ArrowDown className="w-4 h-4 text-green-600" aria-label="Improved" />
   if (dir === 'worsened') return <ArrowUp className="w-4 h-4 text-red-500" aria-label="Worsened" />
@@ -67,6 +93,20 @@ export default function AnalysisPage() {
   const [correlation, setCorrelation] = useState<CorrelationResult | null>(null)
   const [loading, setLoading] = useState(true)
 
+  // Regression state
+  const [regressionSymptoms, setRegressionSymptoms] = useState<{ key: string; label: string }[]>([])
+  const [regressionTarget, setRegressionTarget] = useState('')
+  const [regressionDays, setRegressionDays] = useState(90)
+  const [regressionResult, setRegressionResult] = useState<RegressionResult | null>(null)
+  const [regressionLoading, setRegressionLoading] = useState(false)
+  const [regressionError, setRegressionError] = useState('')
+
+  // AI Insights state
+  const [insights, setInsights] = useState<InsightsResult | null>(null)
+  const [insightsLoading, setInsightsLoading] = useState(false)
+  const [insightsError, setInsightsError] = useState('')
+  const [insightsDays, setInsightsDays] = useState(90)
+
   useEffect(() => {
     Promise.all([
       fetch('/api/analysis?type=medication-impact').then((r) => r.json()),
@@ -78,7 +118,52 @@ export default function AnalysisPage() {
       setCorrelation(co)
       setLoading(false)
     }).catch(() => setLoading(false))
+
+    // Load symptom list for regression target selector
+    fetch('/api/analysis?type=correlation&days=90')
+      .then(r => r.json())
+      .then((co: CorrelationResult) => {
+        if (co?.keys?.length) {
+          const syms = co.keys.map(k => ({ key: k, label: co.labels[k] }))
+          setRegressionSymptoms(syms)
+          setRegressionTarget(syms[0]?.key ?? '')
+        }
+      })
+      .catch(() => {})
   }, [])
+
+  function runRegression() {
+    if (!regressionTarget) return
+    setRegressionLoading(true)
+    setRegressionError('')
+    setRegressionResult(null)
+    fetch(`/api/analysis?type=regression&target=${regressionTarget}&days=${regressionDays}`)
+      .then(r => r.json())
+      .then((data) => {
+        if (data.error) { setRegressionError(data.error); return }
+        setRegressionResult(data)
+      })
+      .catch(() => setRegressionError('Failed to run regression'))
+      .finally(() => setRegressionLoading(false))
+  }
+
+  function generateInsights() {
+    setInsightsLoading(true)
+    setInsightsError('')
+    setInsights(null)
+    fetch('/api/insights', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ days: insightsDays }),
+    })
+      .then(r => r.json())
+      .then((data) => {
+        if (data.error) { setInsightsError(data.error); return }
+        setInsights(data)
+      })
+      .catch(() => setInsightsError('Failed to generate insights'))
+      .finally(() => setInsightsLoading(false))
+  }
 
   if (loading) return <div className="animate-pulse text-gray-400 text-center py-12">Analyzing your data…</div>
 
@@ -98,6 +183,8 @@ export default function AnalysisPage() {
           <TabsTrigger value="trends">Trend Detection</TabsTrigger>
           <TabsTrigger value="medication">Medication Impact</TabsTrigger>
           <TabsTrigger value="correlation">Correlation Matrix</TabsTrigger>
+          <TabsTrigger value="regression">Regression</TabsTrigger>
+          <TabsTrigger value="insights">AI Insights</TabsTrigger>
         </TabsList>
 
         {/* Trends Tab */}
@@ -282,6 +369,183 @@ export default function AnalysisPage() {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+        {/* Regression Tab */}
+        <TabsContent value="regression" className="mt-4 space-y-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Multiple Linear Regression</CardTitle>
+              <p className="text-xs text-gray-500">Identify which factors are statistically associated with a target symptom.</p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-wrap items-end gap-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs text-gray-500 font-medium">Target symptom</label>
+                  <select
+                    className="border border-gray-200 rounded-md px-3 py-1.5 text-sm text-gray-800 bg-white min-w-[200px]"
+                    value={regressionTarget}
+                    onChange={e => { setRegressionTarget(e.target.value); setRegressionResult(null) }}
+                  >
+                    {regressionSymptoms.map(s => (
+                      <option key={s.key} value={s.key}>{s.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs text-gray-500 font-medium">Date range</label>
+                  <select
+                    className="border border-gray-200 rounded-md px-3 py-1.5 text-sm text-gray-800 bg-white"
+                    value={regressionDays}
+                    onChange={e => { setRegressionDays(Number(e.target.value)); setRegressionResult(null) }}
+                  >
+                    <option value={30}>Last 30 days</option>
+                    <option value={60}>Last 60 days</option>
+                    <option value={90}>Last 90 days</option>
+                    <option value={180}>Last 180 days</option>
+                  </select>
+                </div>
+                <Button onClick={runRegression} disabled={regressionLoading || !regressionTarget} className="bg-rose-600 hover:bg-rose-700 text-white">
+                  {regressionLoading ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" />Running…</> : 'Run Analysis'}
+                </Button>
+              </div>
+
+              {regressionError && (
+                <div className="rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">{regressionError}</div>
+              )}
+
+              {regressionResult && (
+                <div className="space-y-4">
+                  <div className="flex flex-wrap gap-4">
+                    <div className="bg-gray-50 rounded-lg p-4 text-center min-w-[100px]">
+                      <p className="text-2xl font-bold text-gray-900">{(regressionResult.r2 * 100).toFixed(1)}%</p>
+                      <p className="text-xs text-gray-500 mt-0.5">R² (variance explained)</p>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-4 text-center min-w-[100px]">
+                      <p className="text-2xl font-bold text-gray-900">{(regressionResult.adjustedR2 * 100).toFixed(1)}%</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Adjusted R²</p>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-4 text-center min-w-[100px]">
+                      <p className="text-2xl font-bold text-gray-900">{regressionResult.n}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Days analyzed</p>
+                    </div>
+                  </div>
+
+                  {regressionResult.predictors.filter(p => p.significant).length > 0 && (
+                    <div className="rounded-lg bg-purple-50 border border-purple-100 p-3 space-y-1">
+                      <p className="text-xs font-semibold text-purple-700 mb-2">Significant predictors of {regressionResult.target.label}:</p>
+                      {regressionResult.predictors.filter(p => p.significant).map(p => (
+                        <p key={p.key} className="text-xs text-purple-800">• {p.interpretation}</p>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-100">
+                          <th className="text-left py-2 text-xs text-gray-500 font-medium">Predictor</th>
+                          <th className="text-center py-2 text-xs text-gray-500 font-medium">Coeff (β)</th>
+                          <th className="text-center py-2 text-xs text-gray-500 font-medium">t-stat</th>
+                          <th className="text-center py-2 text-xs text-gray-500 font-medium">p-value</th>
+                          <th className="text-center py-2 text-xs text-gray-500 font-medium">Sig.</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {regressionResult.predictors.slice(0, 20).map(p => (
+                          <tr key={p.key} className={`border-b border-gray-50 ${p.significant ? 'bg-purple-50/40' : ''}`}>
+                            <td className="py-1.5 text-gray-700 text-sm">{p.name}</td>
+                            <td className={`text-center py-1.5 font-mono text-xs ${p.coefficient > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                              {p.coefficient > 0 ? '+' : ''}{p.coefficient.toFixed(3)}
+                            </td>
+                            <td className="text-center py-1.5 text-gray-500 font-mono text-xs">{p.tStat.toFixed(2)}</td>
+                            <td className="text-center py-1.5 text-gray-500 font-mono text-xs">{p.pValue.toFixed(3)}</td>
+                            <td className="text-center py-1.5">
+                              {p.significant ? <Badge className="bg-purple-100 text-purple-700 text-[10px]">p&lt;0.05</Badge> : <span className="text-gray-300 text-xs">—</span>}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="text-xs text-gray-400">Positive β = predictor associated with higher severity. Negative β = associated with lower severity. p&lt;0.05 indicates statistical significance.</p>
+                </div>
+              )}
+
+              {!regressionResult && !regressionLoading && !regressionError && (
+                <p className="text-sm text-gray-400 text-center py-6">Select a target symptom and click Run Analysis.</p>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* AI Insights Tab */}
+        <TabsContent value="insights" className="mt-4 space-y-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Brain className="w-5 h-5 text-purple-600" />
+                AI Clinical Insights
+              </CardTitle>
+              <p className="text-xs text-gray-500">Claude analyzes your health data and generates a structured summary to support conversations with your healthcare provider.</p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-wrap items-end gap-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs text-gray-500 font-medium">Date range</label>
+                  <select
+                    className="border border-gray-200 rounded-md px-3 py-1.5 text-sm text-gray-800 bg-white"
+                    value={insightsDays}
+                    onChange={e => { setInsightsDays(Number(e.target.value)); setInsights(null) }}
+                  >
+                    <option value={30}>Last 30 days</option>
+                    <option value={60}>Last 60 days</option>
+                    <option value={90}>Last 90 days</option>
+                    <option value={180}>Last 180 days</option>
+                  </select>
+                </div>
+                <Button onClick={generateInsights} disabled={insightsLoading} className="bg-purple-600 hover:bg-purple-700 text-white">
+                  {insightsLoading ? <><Loader2 className="w-4 h-4 mr-1.5 animate-spin" />Generating…</> : <><Brain className="w-4 h-4 mr-1.5" />Generate Insights</>}
+                </Button>
+              </div>
+
+              {insightsError && (
+                <div className="rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">{insightsError}</div>
+              )}
+
+              {insights && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-gray-400">Generated {new Date(insights.generatedAt).toLocaleString()} · {insights.dataRange.entries} log entries over {insights.dataRange.days} days</p>
+                  </div>
+                  <div className="rounded-lg border border-purple-100 bg-purple-50/30 p-4">
+                    <div className="prose prose-sm max-w-none text-gray-800">
+                      {insights.insights.split('\n').map((line, i) => {
+                        const isBold = line.startsWith('**') && line.includes('**')
+                        const content = line.replace(/\*\*/g, '')
+                        if (!line.trim()) return <div key={i} className="h-2" />
+                        if (isBold && line.trim().startsWith('**') && line.trim().endsWith('**')) {
+                          return <p key={i} className="font-semibold text-gray-900 mt-4 mb-1 text-sm">{content}</p>
+                        }
+                        if (line.trim().startsWith('-') || line.trim().startsWith('•')) {
+                          return <p key={i} className="text-sm text-gray-700 pl-4">{line}</p>
+                        }
+                        return <p key={i} className="text-sm text-gray-700">{line}</p>
+                      })}
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-400 italic">This AI summary is for informational purposes only and does not constitute medical advice. Always discuss findings with your healthcare provider.</p>
+                </div>
+              )}
+
+              {!insights && !insightsLoading && !insightsError && (
+                <div className="text-center py-8 space-y-2">
+                  <Brain className="w-10 h-10 text-purple-200 mx-auto" />
+                  <p className="text-sm text-gray-400">Click Generate Insights to get a Claude AI analysis of your health data.</p>
+                  <p className="text-xs text-gray-400">Requires ANTHROPIC_API_KEY to be configured.</p>
                 </div>
               )}
             </CardContent>

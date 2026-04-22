@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { mean, pearsonCorrelation, pairedTTest, rollingAverage, trendDirection } from '@/lib/stats'
+import { mean, pearsonCorrelation, pairedTTest, rollingAverage, trendDirection, multipleLinearRegression } from '@/lib/stats'
 import { subDays } from 'date-fns'
 
 export async function GET(req: NextRequest) {
@@ -21,6 +21,11 @@ export async function GET(req: NextRequest) {
   }
   if (type === 'trends') {
     return getTrends()
+  }
+  if (type === 'regression') {
+    const target = searchParams.get('target') ?? ''
+    const days = parseInt(searchParams.get('days') ?? '90')
+    return getRegressionAnalysis(target, days)
   }
 
   return NextResponse.json({ error: 'Unknown analysis type' }, { status: 400 })
@@ -142,4 +147,81 @@ async function getTrends() {
   })
 
   return NextResponse.json(trends)
+}
+
+async function getRegressionAnalysis(targetKey: string, days: number) {
+  if (!targetKey) return NextResponse.json({ error: 'target required' }, { status: 400 })
+
+  const since = subDays(new Date(), days)
+  const [entries, symptoms, medications] = await Promise.all([
+    prisma.logEntry.findMany({
+      where: { entryDate: { gte: since } },
+      include: { symptomScores: true, biometrics: true, periodLog: true },
+      orderBy: { entryDate: 'asc' },
+    }),
+    prisma.symptomDefinition.findMany({ where: { isActive: true }, orderBy: { sortOrder: 'asc' } }),
+    prisma.medication.findMany({ include: { periods: true } }),
+  ])
+
+  if (entries.length < 10) return NextResponse.json({ error: 'Not enough data (need at least 10 entries)' }, { status: 422 })
+
+  const targetDef = symptoms.find(s => s.key === targetKey)
+  if (!targetDef) return NextResponse.json({ error: 'Target symptom not found' }, { status: 404 })
+
+  const y = entries.map(e => e.symptomScores.find(s => s.symptomKey === targetKey)?.score ?? 0)
+
+  // Build predictor list: other symptoms + sleep + period + active meds
+  const predictors: { key: string; name: string; values: number[] }[] = []
+
+  // Other active symptoms
+  for (const sym of symptoms) {
+    if (sym.key === targetKey) continue
+    predictors.push({
+      key: sym.key,
+      name: sym.label,
+      values: entries.map(e => e.symptomScores.find(s => s.symptomKey === sym.key)?.score ?? 0),
+    })
+  }
+
+  // Sleep hours biometric
+  const sleepValues = entries.map(e => {
+    const b = e.biometrics.find(b => b.metricKey === 'sleep_hours')
+    return b?.metricValue ? parseFloat(b.metricValue.toString()) : mean(entries.map(e2 => {
+      const b2 = e2.biometrics.find(b3 => b3.metricKey === 'sleep_hours')
+      return b2?.metricValue ? parseFloat(b2.metricValue.toString()) : 0
+    }))
+  })
+  if (sleepValues.some(v => v > 0)) {
+    predictors.push({ key: 'sleep_hours', name: 'Sleep Hours', values: sleepValues })
+  }
+
+  // Period present
+  predictors.push({
+    key: 'period_present',
+    name: 'Period Present',
+    values: entries.map(e => e.periodLog?.isPresent ? 1 : 0),
+  })
+
+  // Active medication flags
+  for (const med of medications) {
+    const activePeriod = med.periods.find(p => p.startDate <= new Date() && (!p.endDate || p.endDate >= since))
+    if (!activePeriod) continue
+    predictors.push({
+      key: `med_${med.id}`,
+      name: `${med.name} active`,
+      values: entries.map(e => {
+        const d = e.entryDate as unknown as Date
+        return activePeriod.startDate <= d && (!activePeriod.endDate || activePeriod.endDate >= d) ? 1 : 0
+      }),
+    })
+  }
+
+  const result = multipleLinearRegression(y, predictors)
+  if (!result) return NextResponse.json({ error: 'Regression failed — check data variance' }, { status: 422 })
+
+  return NextResponse.json({
+    target: { key: targetDef.key, label: targetDef.label },
+    ...result,
+    symptoms: symptoms.map(s => ({ key: s.key, label: s.label })),
+  })
 }

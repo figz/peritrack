@@ -15,6 +15,7 @@ import {
   CalendarHeart,
   BarChart3,
   FlaskConical,
+  FileText,
   Settings,
   LogOut,
   PlusCircle,
@@ -28,6 +29,7 @@ const navItems = [
   { href: '/events', label: 'Life Events', icon: CalendarHeart },
   { href: '/charts', label: 'Charts', icon: BarChart3 },
   { href: '/analysis', label: 'Analysis', icon: FlaskConical },
+  { href: '/report', label: 'Doctor Report', icon: FileText },
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
 
