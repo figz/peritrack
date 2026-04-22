@@ -2,12 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { format } from 'date-fns'
+import { format, subDays } from 'date-fns'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { PlusCircle, ChevronLeft, ChevronRight, Eye } from 'lucide-react'
 
 interface LogEntry {
@@ -22,27 +20,35 @@ interface LogEntry {
 
 const SCORE_COLORS = ['', 'bg-yellow-100 text-yellow-700', 'bg-orange-100 text-orange-700', 'bg-red-100 text-red-700']
 
+const RANGES = [
+  { label: 'Last 7 days', days: 7 },
+  { label: 'Last 30 days', days: 30 },
+  { label: 'Last 90 days', days: 90 },
+  { label: 'All time', days: null },
+] as const
+
 export default function LogHistoryPage() {
   const [entries, setEntries] = useState<LogEntry[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
-  const [fromDate, setFromDate] = useState('')
-  const [toDate, setToDate] = useState('')
+  const [rangeDays, setRangeDays] = useState<number | null>(30)
 
   const limit = 20
 
   useEffect(() => {
     setLoading(true)
     const params = new URLSearchParams({ page: String(page), limit: String(limit) })
-    if (fromDate) params.set('from', fromDate)
-    if (toDate) params.set('to', toDate)
+    if (rangeDays !== null) {
+      const from = format(subDays(new Date(), rangeDays), 'yyyy-MM-dd')
+      params.set('from', from)
+    }
 
     fetch(`/api/log?${params}`)
       .then((r) => r.json())
       .then((d) => { setEntries(d.entries ?? []); setTotal(d.total ?? 0) })
       .finally(() => setLoading(false))
-  }, [page, fromDate, toDate])
+  }, [page, rangeDays])
 
   const totalPages = Math.ceil(total / limit)
 
@@ -55,21 +61,23 @@ export default function LogHistoryPage() {
         </Button>
       </div>
 
-      {/* Filters */}
-      <Card>
-        <CardContent className="pt-4">
-          <div className="grid grid-cols-2 gap-4 max-w-sm">
-            <div className="space-y-1">
-              <Label htmlFor="from-date" className="text-xs text-gray-500">From</Label>
-              <Input id="from-date" type="date" value={fromDate} onChange={(e) => { setFromDate(e.target.value); setPage(1) }} className="min-h-[44px]" />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="to-date" className="text-xs text-gray-500">To</Label>
-              <Input id="to-date" type="date" value={toDate} onChange={(e) => { setToDate(e.target.value); setPage(1) }} className="min-h-[44px]" />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Range filter */}
+      <div className="flex gap-2 flex-wrap">
+        {RANGES.map(({ label, days }) => (
+          <button
+            key={label}
+            type="button"
+            onClick={() => { setRangeDays(days); setPage(1) }}
+            className={`min-h-[40px] px-4 py-1.5 rounded-full border text-sm font-medium transition-all ${
+              rangeDays === days
+                ? 'bg-rose-600 border-rose-600 text-white'
+                : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
 
       {loading ? (
         <div className="animate-pulse text-gray-400 text-center py-12">Loading…</div>
@@ -84,7 +92,7 @@ export default function LogHistoryPage() {
         </Card>
       ) : (
         <>
-          <div className="text-sm text-gray-500">{total} entries total</div>
+          <div className="text-sm text-gray-500">{total} {total === 1 ? 'entry' : 'entries'}</div>
           <div className="space-y-3">
             {entries.map((entry) => {
               const notable = entry.symptomScores.filter((s) => s.score >= 2)
@@ -122,7 +130,7 @@ export default function LogHistoryPage() {
                           <Badge className="bg-rose-100 text-rose-700 text-xs">Period</Badge>
                         )}
                         <Button variant="ghost" size="sm" asChild className="min-h-[44px]">
-                          <Link href={`/log/new?date=${entry.entryDate.slice(0, 10)}`}>
+                          <Link href={`/log/new?date=${entry.entryDate}`}>
                             <Eye className="w-4 h-4" aria-hidden />
                             <span className="sr-only">Edit entry</span>
                           </Link>
