@@ -36,7 +36,8 @@ export async function GET(req: NextRequest) {
     prisma.logEntry.count({ where }),
   ])
 
-  return NextResponse.json({ entries, total, page, limit })
+  const out = entries.map((e) => ({ ...e, entryDate: e.entryDate.toISOString().slice(0, 10) }))
+  return NextResponse.json({ entries: out, total, page, limit })
 }
 
 export async function POST(req: NextRequest) {
@@ -75,7 +76,7 @@ export async function POST(req: NextRequest) {
         include: { symptomScores: true, sideEffectScores: true, periodLog: true, biometrics: true },
       })
     })
-    return NextResponse.json(updated)
+    return NextResponse.json({ ...updated, entryDate: updated.entryDate.toISOString().slice(0, 10) })
   }
 
   const entry = await prisma.logEntry.create({
@@ -96,7 +97,7 @@ export async function POST(req: NextRequest) {
     include: { symptomScores: true, sideEffectScores: true, periodLog: true, biometrics: true },
   })
 
-  return NextResponse.json(entry, { status: 201 })
+  return NextResponse.json({ ...entry, entryDate: entry.entryDate.toISOString().slice(0, 10) }, { status: 201 })
 }
 
 export async function DELETE(req: NextRequest) {

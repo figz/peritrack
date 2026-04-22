@@ -71,8 +71,8 @@ export async function GET() {
     today: { logged: !!todayEntry },
     topSymptoms,
     activeMedications,
-    lastPeriodDate: lastPeriodEntry?.logEntry.entryDate ?? null,
-    lastWeight: lastWeightEntry ? { value: lastWeightEntry.weightLbs, date: lastWeightEntry.entryDate } : null,
-    recentEntries,
+    lastPeriodDate: lastPeriodEntry?.logEntry.entryDate.toISOString().slice(0, 10) ?? null,
+    lastWeight: lastWeightEntry ? { value: lastWeightEntry.weightLbs, date: lastWeightEntry.entryDate.toISOString().slice(0, 10) } : null,
+    recentEntries: recentEntries.map((e) => ({ ...e, entryDate: e.entryDate.toISOString().slice(0, 10) })),
   })
 }

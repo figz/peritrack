@@ -8,11 +8,6 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { PlusCircle, CheckCircle2, Droplets, Scale, Pill, Activity, ClipboardList } from 'lucide-react'
 
-function localDate(s: string) {
-  const [y, m, d] = s.slice(0, 10).split('-').map(Number)
-  return new Date(y, m - 1, d)
-}
-
 interface DashboardData {
   today: { logged: boolean }
   topSymptoms: { key: string; label: string; avg: number }[]
@@ -133,9 +128,9 @@ export default function DashboardPage() {
                 <p className="text-xs text-gray-500">Last Period</p>
                 <p className="font-semibold text-sm">
                   {data.lastPeriodDate
-                    ? isToday(localDate(data.lastPeriodDate))
+                    ? isToday(new Date(data.lastPeriodDate + 'T00:00:00'))
                       ? 'Today'
-                      : format(localDate(data.lastPeriodDate), 'MMM d')
+                      : format(new Date(data.lastPeriodDate + 'T00:00:00'), 'MMM d')
                     : 'Not recorded'}
                 </p>
               </div>
@@ -151,7 +146,7 @@ export default function DashboardPage() {
                   {data.lastWeight ? `${data.lastWeight.value} lbs` : 'Not recorded'}
                 </p>
                 {data.lastWeight && (
-                  <p className="text-xs text-gray-400">{format(localDate(data.lastWeight.date), 'MMM d')}</p>
+                  <p className="text-xs text-gray-400">{format(new Date(data.lastWeight.date + 'T00:00:00'), 'MMM d')}</p>
                 )}
               </div>
             </CardContent>
@@ -190,7 +185,7 @@ export default function DashboardPage() {
                 <Link key={entry.id} href={`/log/new?date=${entry.entryDate.slice(0, 10)}`} className="block">
                   <div className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 border border-gray-100">
                     <div>
-                      <p className="text-sm font-medium">{format(new Date(entry.entryDate), 'EEEE, MMM d')}</p>
+                      <p className="text-sm font-medium">{format(new Date(entry.entryDate + 'T00:00:00'), 'EEEE, MMM d')}</p>
                       {entry.notes && <p className="text-xs text-gray-400 truncate max-w-[200px]">{entry.notes}</p>}
                     </div>
                     <div className="flex flex-wrap gap-1 max-w-[160px] justify-end">

@@ -144,6 +144,23 @@ export function CheckInForm() {
 
   useEffect(() => {
     const loadEntry = async () => {
+      // Reset all fields before loading so stale data never bleeds between dates
+      setExistingId(null)
+      setSymptomScores({})
+      setSideEffectScores({})
+      setNotes('')
+      setWeight('')
+      setHydration(0)
+      setNutritionQuality(0)
+      setDailyWalk(null)
+      setPtExercises(null)
+      setOtherExercise(null)
+      setPeriodPresent(false)
+      setFlowSeverity(0)
+      setSpotting(false)
+      setSpottingColor('')
+      setBiometrics(DEFAULT_BIOMETRICS)
+
       const res = await fetch(`/api/log?from=${date}&to=${date}&limit=1`)
       const data = await res.json()
       if (data.entries?.length > 0) {
