@@ -112,6 +112,10 @@ export function CheckInForm() {
   const searchParams = useSearchParams()
 
   const [date, setDate] = useState(() => searchParams.get('date') ?? format(new Date(), 'yyyy-MM-dd'))
+
+  useEffect(() => {
+    setDate(searchParams.get('date') ?? format(new Date(), 'yyyy-MM-dd'))
+  }, [searchParams])
   const [symptoms, setSymptoms] = useState<SymptomDef[]>([])
   const [sideEffects, setSideEffects] = useState<SymptomDef[]>([])
   const [symptomScores, setSymptomScores] = useState<Record<string, number>>({})
