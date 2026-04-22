@@ -123,6 +123,7 @@ export function CheckInForm() {
   const [periodPresent, setPeriodPresent] = useState(false)
   const [flowSeverity, setFlowSeverity] = useState(0)
   const [spotting, setSpotting] = useState(false)
+  const [spottingColor, setSpottingColor] = useState<'pale_pink' | 'red' | 'brown' | ''>('')
   const [biometrics, setBiometrics] = useState<BiometricEntry[]>(DEFAULT_BIOMETRICS)
   const [weight, setWeight] = useState('')
   const [notes, setNotes] = useState('')
@@ -160,6 +161,7 @@ export function CheckInForm() {
           setPeriodPresent(entry.periodLog.isPresent)
           setFlowSeverity(entry.periodLog.flowSeverity ?? 0)
           setSpotting(entry.periodLog.spotting)
+          setSpottingColor(entry.periodLog.spottingColor ?? '')
         }
         const bio = [...DEFAULT_BIOMETRICS]
         entry.biometrics.forEach((b: { metricKey: string; metricValue: string }) => {
@@ -181,6 +183,7 @@ export function CheckInForm() {
           setPeriodPresent(d.periodPresent ?? false)
           setFlowSeverity(d.flowSeverity ?? 0)
           setSpotting(d.spotting ?? false)
+          setSpottingColor(d.spottingColor ?? '')
           setBiometrics(d.biometrics ?? DEFAULT_BIOMETRICS)
         }
       } catch {}
@@ -190,9 +193,9 @@ export function CheckInForm() {
 
   const saveDraft = useCallback(() => {
     try {
-      localStorage.setItem(draftKey, JSON.stringify({ symptomScores, sideEffectScores, notes, weight, periodPresent, flowSeverity, spotting, biometrics }))
+      localStorage.setItem(draftKey, JSON.stringify({ symptomScores, sideEffectScores, notes, weight, periodPresent, flowSeverity, spotting, spottingColor, biometrics }))
     } catch {}
-  }, [draftKey, symptomScores, sideEffectScores, notes, weight, periodPresent, flowSeverity, spotting, biometrics])
+  }, [draftKey, symptomScores, sideEffectScores, notes, weight, periodPresent, flowSeverity, spotting, spottingColor, biometrics])
 
   useEffect(() => {
     autoSaveRef.current = setInterval(saveDraft, 30000)
@@ -223,6 +226,7 @@ export function CheckInForm() {
           isPresent: periodPresent,
           flowSeverity: periodPresent ? flowSeverity : null,
           spotting,
+          spottingColor: spotting && spottingColor ? spottingColor : null,
         } : null,
         biometrics: biometrics.filter((b) => b.value !== '').map((b) => ({ key: b.key, value: b.value, unit: b.unit })),
       }
@@ -358,8 +362,30 @@ export function CheckInForm() {
           )}
           <div className="flex items-center justify-between min-h-[44px]">
             <Label htmlFor="spotting" className="text-sm">Spotting</Label>
-            <Switch id="spotting" checked={spotting} onCheckedChange={setSpotting} />
+            <Switch id="spotting" checked={spotting} onCheckedChange={(v) => { setSpotting(v); if (!v) setSpottingColor('') }} />
           </div>
+          {spotting && (
+            <div className="space-y-2">
+              <Label className="text-sm">Spotting Color</Label>
+              <div className="flex gap-2 flex-wrap">
+                {([
+                  { value: 'pale_pink', label: 'Light pink' },
+                  { value: 'red', label: 'Red' },
+                  { value: 'brown', label: 'Brown' },
+                ] as { value: 'pale_pink' | 'red' | 'brown'; label: string }[]).map(({ value, label }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setSpottingColor(spottingColor === value ? '' : value)}
+                    aria-pressed={spottingColor === value}
+                    className={`min-h-[44px] px-3 py-2 rounded-lg border text-sm font-medium transition-all ${spottingColor === value ? 'bg-rose-50 border-rose-300 text-rose-700' : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
