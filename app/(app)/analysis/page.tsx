@@ -490,7 +490,7 @@ export default function AnalysisPage() {
                 <Brain className="w-5 h-5 text-purple-600" />
                 AI Clinical Insights
               </CardTitle>
-              <p className="text-xs text-gray-500">Claude analyzes your health data and generates a structured summary to support conversations with your healthcare provider.</p>
+              <p className="text-xs text-gray-500">Gemini analyzes your health data and generates a structured summary to support conversations with your healthcare provider.</p>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex flex-wrap items-end gap-3">
@@ -544,7 +544,7 @@ export default function AnalysisPage() {
               {!insights && !insightsLoading && !insightsError && (
                 <div className="text-center py-8 space-y-2">
                   <Brain className="w-10 h-10 text-purple-200 mx-auto" />
-                  <p className="text-sm text-gray-400">Click Generate Insights to get a Claude AI analysis of your health data.</p>
+                  <p className="text-sm text-gray-400">Click Generate Insights to get a Gemini AI analysis of your health data.</p>
                   <p className="text-xs text-gray-400">Requires GEMINI_API_KEY to be configured.</p>
                 </div>
               )}
