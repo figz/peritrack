@@ -545,7 +545,7 @@ export default function AnalysisPage() {
                 <div className="text-center py-8 space-y-2">
                   <Brain className="w-10 h-10 text-purple-200 mx-auto" />
                   <p className="text-sm text-gray-400">Click Generate Insights to get a Claude AI analysis of your health data.</p>
-                  <p className="text-xs text-gray-400">Requires ANTHROPIC_API_KEY to be configured.</p>
+                  <p className="text-xs text-gray-400">Requires GEMINI_API_KEY to be configured.</p>
                 </div>
               )}
             </CardContent>

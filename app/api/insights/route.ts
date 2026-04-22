@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import Anthropic from '@anthropic-ai/sdk'
+import { GoogleGenerativeAI } from '@google/generative-ai'
 import { subDays } from 'date-fns'
 import { mean, trendDirection } from '@/lib/stats'
 
@@ -10,8 +10,8 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) return NextResponse.json({ error: 'AI insights not configured (ANTHROPIC_API_KEY missing)' }, { status: 503 })
+  const apiKey = process.env.GEMINI_API_KEY
+  if (!apiKey) return NextResponse.json({ error: 'AI insights not configured (GEMINI_API_KEY missing)' }, { status: 503 })
 
   const body = await req.json().catch(() => ({}))
   const days = body.days ?? 90
@@ -123,15 +123,10 @@ Note any symptoms that are improving or areas of progress.
 
 Keep the language accessible to a non-clinician but precise enough to be medically useful. Do not diagnose or recommend treatment changes.`
 
-  const client = new Anthropic({ apiKey })
-
-  const message = await client.messages.create({
-    model: 'claude-opus-4-7',
-    max_tokens: 1500,
-    messages: [{ role: 'user', content: prompt }],
-  })
-
-  const content = message.content[0].type === 'text' ? message.content[0].text : ''
+  const genAI = new GoogleGenerativeAI(apiKey)
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
+  const result = await model.generateContent(prompt)
+  const content = result.response.text()
 
   return NextResponse.json({
     insights: content,
