@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
-  const { name, type, dose, frequency, notes, startDate } = body
+  const { name, type, dose, frequency, notes, startDate, endDate } = body
 
   const med = await prisma.medication.create({
     data: {
@@ -28,9 +28,13 @@ export async function POST(req: NextRequest) {
       dose,
       frequency,
       notes,
-      isActive: true,
+      isActive: !endDate,
       periods: startDate ? {
-        create: { startDate: new Date(startDate), doseAtStart: dose },
+        create: {
+          startDate: new Date(startDate),
+          doseAtStart: dose,
+          endDate: endDate ? new Date(endDate) : undefined,
+        },
       } : undefined,
     },
     include: { periods: true },

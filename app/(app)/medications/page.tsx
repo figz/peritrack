@@ -48,7 +48,7 @@ const TYPE_COLORS: Record<string, string> = {
   other: 'bg-gray-100 text-gray-600',
 }
 
-const emptyForm = { name: '', type: 'medication', dose: '', frequency: '', notes: '', startDate: format(new Date(), 'yyyy-MM-dd') }
+const emptyForm = { name: '', type: 'medication', dose: '', frequency: '', notes: '', startDate: format(new Date(), 'yyyy-MM-dd'), endDate: '' }
 
 export default function MedicationsPage() {
   const [medications, setMedications] = useState<Medication[]>([])
@@ -75,7 +75,15 @@ export default function MedicationsPage() {
 
   function openEdit(med: Medication) {
     setEditingId(med.id)
-    setForm({ name: med.name, type: med.type, dose: med.dose ?? '', frequency: med.frequency ?? '', notes: med.notes ?? '', startDate: med.periods[0]?.startDate ? format(new Date(med.periods[0].startDate), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd') })
+    setForm({
+      name: med.name,
+      type: med.type,
+      dose: med.dose ?? '',
+      frequency: med.frequency ?? '',
+      notes: med.notes ?? '',
+      startDate: med.periods[0]?.startDate ? format(new Date(med.periods[0].startDate), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
+      endDate: med.periods[0]?.endDate ? format(new Date(med.periods[0].endDate), 'yyyy-MM-dd') : '',
+    })
     setDialogOpen(true)
   }
 
@@ -83,11 +91,13 @@ export default function MedicationsPage() {
     setSaving(true)
     try {
       if (editingId) {
-        const res = await fetch(`/api/medications/${editingId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
+        const payload = { ...form, endDate: form.endDate || undefined, isActive: !form.endDate }
+        const res = await fetch(`/api/medications/${editingId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
         if (!res.ok) throw new Error()
         toast.success('Medication updated')
       } else {
-        const res = await fetch('/api/medications', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
+        const payload = { ...form, endDate: form.endDate || undefined }
+        const res = await fetch('/api/medications', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
         if (!res.ok) throw new Error()
         toast.success('Medication added')
       }
@@ -154,9 +164,15 @@ export default function MedicationsPage() {
                   <Input id="med-freq" value={form.frequency} onChange={(e) => setForm((f) => ({ ...f, frequency: e.target.value }))} placeholder="e.g. Daily" className="min-h-[44px]" />
                 </div>
               </div>
-              <div className="space-y-1">
-                <Label htmlFor="med-start">Start Date</Label>
-                <Input id="med-start" type="date" value={form.startDate} onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))} className="min-h-[44px]" />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="med-start">Start Date</Label>
+                  <Input id="med-start" type="date" value={form.startDate} onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))} className="min-h-[44px]" />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="med-end">End Date <span className="text-gray-400 font-normal">(if stopped)</span></Label>
+                  <Input id="med-end" type="date" value={form.endDate} onChange={(e) => setForm((f) => ({ ...f, endDate: e.target.value }))} className="min-h-[44px]" />
+                </div>
               </div>
               <div className="space-y-1">
                 <Label htmlFor="med-notes">Notes</Label>
