@@ -445,7 +445,7 @@ export function CheckInForm() {
           disabled={saving}
           className="flex-1 min-h-[48px]"
         >
-          Save &amp; Log Other
+          Save &amp; Log {period === 'morning' ? 'Evening' : 'Morning'}
         </Button>
       </div>
     </div>
