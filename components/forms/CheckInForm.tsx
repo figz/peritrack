@@ -100,6 +100,15 @@ function CategorySection({
   )
 }
 
+const PRN_MEDS = ['Xanax', 'Tylenol', 'Ibuprofen'] as const
+type PrnMedName = typeof PRN_MEDS[number]
+interface PrnMedEntry { taken: boolean; dose: string; reason: string }
+const DEFAULT_PRN_MEDS: Record<PrnMedName, PrnMedEntry> = {
+  Xanax: { taken: false, dose: '', reason: '' },
+  Tylenol: { taken: false, dose: '', reason: '' },
+  Ibuprofen: { taken: false, dose: '', reason: '' },
+}
+
 const DEFAULT_BIOMETRICS: BiometricEntry[] = [
   { key: 'heart_rate', label: 'Resting Heart Rate', unit: 'bpm', value: '' },
   { key: 'sleep_hours', label: 'Sleep Hours', unit: 'hrs', value: '' },
@@ -129,6 +138,7 @@ export function CheckInForm() {
   const [dailyWalk, setDailyWalk] = useState<boolean | null>(null)
   const [ptExercises, setPtExercises] = useState<boolean | null>(null)
   const [otherExercise, setOtherExercise] = useState<boolean | null>(null)
+  const [prnMeds, setPrnMeds] = useState<Record<PrnMedName, PrnMedEntry>>(DEFAULT_PRN_MEDS)
   const [biometrics, setBiometrics] = useState<BiometricEntry[]>(DEFAULT_BIOMETRICS)
   const [weight, setWeight] = useState('')
   const [notes, setNotes] = useState('')
@@ -163,6 +173,7 @@ export function CheckInForm() {
       setFlowSeverity(0)
       setSpotting(false)
       setSpottingColor('')
+      setPrnMeds(DEFAULT_PRN_MEDS)
       setBiometrics(DEFAULT_BIOMETRICS)
 
       const res = await fetch(`/api/log?from=${date}&to=${date}&limit=1`)
@@ -195,6 +206,15 @@ export function CheckInForm() {
           if (idx >= 0) bio[idx] = { ...bio[idx], value: b.metricValue?.toString() ?? '' }
         })
         setBiometrics(bio)
+        if (entry.prnMedLogs?.length) {
+          const prn = { ...DEFAULT_PRN_MEDS }
+          entry.prnMedLogs.forEach((m: { medName: string; taken: boolean; dose: string | null; reason: string | null }) => {
+            if (m.medName in prn) {
+              prn[m.medName as PrnMedName] = { taken: m.taken, dose: m.dose ?? '', reason: m.reason ?? '' }
+            }
+          })
+          setPrnMeds(prn)
+        }
         return
       }
       try {
@@ -226,10 +246,10 @@ export function CheckInForm() {
       localStorage.setItem(draftKey, JSON.stringify({
         symptomScores, sideEffectScores, notes, weight,
         hydration, nutritionQuality, dailyWalk, ptExercises, otherExercise,
-        periodPresent, flowSeverity, spotting, spottingColor, biometrics,
+        periodPresent, flowSeverity, spotting, spottingColor, biometrics, prnMeds,
       }))
     } catch {}
-  }, [draftKey, symptomScores, sideEffectScores, notes, weight, hydration, nutritionQuality, dailyWalk, ptExercises, otherExercise, periodPresent, flowSeverity, spotting, spottingColor, biometrics])
+  }, [draftKey, symptomScores, sideEffectScores, notes, weight, hydration, nutritionQuality, dailyWalk, ptExercises, otherExercise, periodPresent, flowSeverity, spotting, spottingColor, biometrics, prnMeds])
 
   useEffect(() => {
     autoSaveRef.current = setInterval(saveDraft, 30000)
@@ -267,6 +287,7 @@ export function CheckInForm() {
           spottingColor: spotting && spottingColor ? spottingColor : null,
         } : null,
         biometrics: biometrics.filter((b) => b.value !== '').map((b) => ({ key: b.key, value: b.value, unit: b.unit })),
+        prnMeds: PRN_MEDS.map(name => ({ name, ...prnMeds[name] })),
       }
 
       const res = await fetch('/api/log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
@@ -391,6 +412,53 @@ export function CheckInForm() {
             <Label className="text-sm">Other Exercise</Label>
             <YesNoToggle value={otherExercise} onChange={setOtherExercise} label="Other Exercise" />
           </div>
+        </CardContent>
+      </Card>
+
+      {/* As-Needed Medications */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">As-Needed Medications</CardTitle>
+          <p className="text-xs text-gray-500">Log any PRN medications taken today</p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {PRN_MEDS.map((name) => {
+            const entry = prnMeds[name]
+            return (
+              <div key={name} className="space-y-2">
+                <div className="flex items-center justify-between min-h-[44px]">
+                  <Label className="text-sm font-medium">{name}</Label>
+                  <YesNoToggle
+                    value={entry.taken ? true : null}
+                    onChange={(v) => setPrnMeds(prev => ({ ...prev, [name]: { ...prev[name], taken: v === true, dose: v === true ? prev[name].dose : '', reason: v === true ? prev[name].reason : '' } }))}
+                    label={`${name} taken`}
+                  />
+                </div>
+                {entry.taken && (
+                  <div className="pl-2 space-y-2 border-l-2 border-rose-100">
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs text-gray-500 w-16 shrink-0">Dose</Label>
+                      <Input
+                        placeholder="e.g. 0.5mg, 500mg, 400mg"
+                        value={entry.dose}
+                        onChange={(e) => setPrnMeds(prev => ({ ...prev, [name]: { ...prev[name], dose: e.target.value } }))}
+                        className="h-9 text-sm"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs text-gray-500 w-16 shrink-0">Reason</Label>
+                      <Input
+                        placeholder="e.g. anxiety, headache, cramps"
+                        value={entry.reason}
+                        onChange={(e) => setPrnMeds(prev => ({ ...prev, [name]: { ...prev[name], reason: e.target.value } }))}
+                        className="h-9 text-sm"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </CardContent>
       </Card>
 

@@ -28,6 +28,7 @@ export async function GET(req: NextRequest) {
         sideEffectScores: true,
         periodLog: true,
         biometrics: true,
+        prnMedLogs: true,
       },
       orderBy: { entryDate: 'desc' },
       skip: (page - 1) * limit,
@@ -45,7 +46,7 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
-  const { entryDate, notes, weightLbs, hydration, nutritionQuality, dailyWalk, ptExercises, otherExercise, symptoms, sideEffects, periodLog, biometrics } = body
+  const { entryDate, notes, weightLbs, hydration, nutritionQuality, dailyWalk, ptExercises, otherExercise, symptoms, sideEffects, periodLog, biometrics, prnMeds } = body
 
   const existing = await prisma.logEntry.findUnique({
     where: { entryDate: new Date(entryDate) },
@@ -57,6 +58,7 @@ export async function POST(req: NextRequest) {
       await tx.sideEffectScore.deleteMany({ where: { logEntryId: existing.id } })
       await tx.periodLog.deleteMany({ where: { logEntryId: existing.id } })
       await tx.biometric.deleteMany({ where: { logEntryId: existing.id } })
+      await tx.prnMedLog.deleteMany({ where: { logEntryId: existing.id } })
 
       return tx.logEntry.update({
         where: { id: existing.id },
@@ -72,8 +74,9 @@ export async function POST(req: NextRequest) {
           sideEffectScores: { create: (sideEffects ?? []).map((s: { key: string; score: number }) => ({ sideEffectKey: s.key, score: s.score })) },
           periodLog: periodLog ? { create: periodLog } : undefined,
           biometrics: { create: (biometrics ?? []).filter((b: { value: string | null }) => b.value !== null && b.value !== '').map((b: { key: string; value: string; unit: string }) => ({ metricKey: b.key, metricValue: parseFloat(b.value), metricUnit: b.unit })) },
+          prnMedLogs: { create: (prnMeds ?? []).filter((m: { taken: boolean }) => m.taken).map((m: { name: string; taken: boolean; dose: string; reason: string }) => ({ medName: m.name, taken: m.taken, dose: m.dose || null, reason: m.reason || null })) },
         },
-        include: { symptomScores: true, sideEffectScores: true, periodLog: true, biometrics: true },
+        include: { symptomScores: true, sideEffectScores: true, periodLog: true, biometrics: true, prnMedLogs: true },
       })
     })
     return NextResponse.json({ ...updated, entryDate: updated.entryDate.toISOString().slice(0, 10) })
@@ -93,8 +96,9 @@ export async function POST(req: NextRequest) {
       sideEffectScores: { create: (sideEffects ?? []).map((s: { key: string; score: number }) => ({ sideEffectKey: s.key, score: s.score })) },
       periodLog: periodLog ? { create: periodLog } : undefined,
       biometrics: { create: (biometrics ?? []).filter((b: { value: string | null }) => b.value !== null && b.value !== '').map((b: { key: string; value: string; unit: string }) => ({ metricKey: b.key, metricValue: parseFloat(b.value), metricUnit: b.unit })) },
+      prnMedLogs: { create: (prnMeds ?? []).filter((m: { taken: boolean }) => m.taken).map((m: { name: string; taken: boolean; dose: string; reason: string }) => ({ medName: m.name, taken: m.taken, dose: m.dose || null, reason: m.reason || null })) },
     },
-    include: { symptomScores: true, sideEffectScores: true, periodLog: true, biometrics: true },
+    include: { symptomScores: true, sideEffectScores: true, periodLog: true, biometrics: true, prnMedLogs: true },
   })
 
   return NextResponse.json({ ...entry, entryDate: entry.entryDate.toISOString().slice(0, 10) }, { status: 201 })

@@ -46,9 +46,23 @@ model LogEntry {
   sideEffectScores SideEffectScore[]
   periodLog        PeriodLog?
   biometrics       Biometric[]
+  prnMedLogs       PrnMedLog[]
 
   @@unique([entryDate])
   @@map("log_entries")
+}
+
+model PrnMedLog {
+  id         String   @id @default(uuid())
+  logEntryId String   @map("log_entry_id")
+  medName    String   @map("med_name") @db.VarChar(128)
+  taken      Boolean  @default(false)
+  dose       String?  @db.VarChar(128)
+  reason     String?
+
+  logEntry   LogEntry @relation(fields: [logEntryId], references: [id], onDelete: Cascade)
+
+  @@map("prn_med_logs")
 }
 
 model SymptomScore {
