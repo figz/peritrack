@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   const [entries, symptoms, sideEffectDefs, medications, lifeEvents] = await Promise.all([
     prisma.logEntry.findMany({
       where: { entryDate: { gte: since } },
-      include: { symptomScores: true, sideEffectScores: true, periodLog: true, biometrics: true },
+      include: { symptomScores: true, sideEffectScores: true, periodLog: true, biometrics: true, prnMedLogs: true },
       orderBy: { entryDate: 'asc' },
     }),
     prisma.symptomDefinition.findMany({ where: { isActive: true }, orderBy: [{ category: 'asc' }, { sortOrder: 'asc' }] }),
@@ -104,6 +104,20 @@ export async function GET(req: NextRequest) {
   ).filter(c => !c.endDate || new Date(c.endDate) >= since)
     .sort((a, b) => b.startDate.localeCompare(a.startDate))
 
+  // PRN medication usage summary
+  const prnNames = ['Xanax', 'Acetaminophen', 'Ibuprofen']
+  const prnStats = prnNames.map(name => {
+    const logs = entries.flatMap(e =>
+      (e as typeof e & { prnMedLogs: { medName: string; taken: boolean; dose: string | null; reason: string | null }[] }).prnMedLogs
+        .filter(m => m.medName === name && m.taken)
+        .map(m => ({ date: e.entryDate.toISOString().slice(0, 10), dose: m.dose, reason: m.reason }))
+    )
+    const reasons = logs.map(l => l.reason).filter(Boolean) as string[]
+    const reasonCounts = reasons.reduce<Record<string, number>>((acc, r) => { acc[r] = (acc[r] ?? 0) + 1; return acc }, {})
+    const topReasons = Object.entries(reasonCounts).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([r]) => r)
+    return { name, daysTaken: logs.length, totalDays: entries.length, topReasons, doses: [...new Set(logs.map(l => l.dose).filter(Boolean))] }
+  }).filter(s => s.daysTaken > 0)
+
   return NextResponse.json({
     reportDate: new Date().toISOString().slice(0, 10),
     dataRange: { days, from: since.toISOString().slice(0, 10), to: new Date().toISOString().slice(0, 10), entryCount: entries.length },
@@ -119,6 +133,7 @@ export async function GET(req: NextRequest) {
     },
     weight: { points: weightPoints, trend: weightTrend },
     biometrics: biometricStats,
+    prnMeds: prnStats,
     lifeEvents: lifeEvents.map(e => ({
       date: e.eventDate.toISOString().slice(0, 10),
       category: e.category,

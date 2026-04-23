@@ -16,6 +16,7 @@ interface ReportData {
   period: { dayCount: number; spottingCount: number; totalDays: number; spottingColors: string[] }
   weight: { points: { date: string; value: number }[]; trend: { slope: number; startWeight: number; endWeight: number; change: number } | null }
   biometrics: ({ key: string; label: string; unit: string; avg: number; count: number } | null)[]
+  prnMeds: { name: string; daysTaken: number; totalDays: number; topReasons: string[]; doses: string[] }[]
   lifeEvents: { date: string; category: string; title: string; description: string | null }[]
 }
 
@@ -317,10 +318,39 @@ export default function ReportPage() {
             )}
           </section>
 
-          {/* 6. Life Events */}
+          {/* 6. As-Needed Medications */}
+          {data.prnMeds.length > 0 && (
+            <section>
+              <h2 className="text-lg font-bold text-gray-900 border-b border-gray-200 pb-1 mb-3">6. As-Needed Medications</h2>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="text-left py-2 px-3 font-semibold text-gray-700">Medication</th>
+                    <th className="text-center py-2 px-3 font-semibold text-gray-700">Days Taken</th>
+                    <th className="text-center py-2 px-3 font-semibold text-gray-700">Frequency</th>
+                    <th className="text-left py-2 px-3 font-semibold text-gray-700">Doses Used</th>
+                    <th className="text-left py-2 px-3 font-semibold text-gray-700">Common Reasons</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.prnMeds.map((m, i) => (
+                    <tr key={m.name} className={i % 2 === 0 ? '' : 'bg-gray-50'}>
+                      <td className="py-2 px-3 font-medium">{m.name}</td>
+                      <td className="py-2 px-3 text-center">{m.daysTaken}</td>
+                      <td className="py-2 px-3 text-center text-gray-500 text-xs">{m.daysTaken}/{m.totalDays} days ({Math.round(m.daysTaken / m.totalDays * 100)}%)</td>
+                      <td className="py-2 px-3 text-gray-600 text-xs">{m.doses.length ? m.doses.join(', ') : '—'}</td>
+                      <td className="py-2 px-3 text-gray-600 text-xs">{m.topReasons.length ? m.topReasons.join(', ') : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+          )}
+
+          {/* 7. Life Events */}
           {data.lifeEvents.length > 0 && (
             <section>
-              <h2 className="text-lg font-bold text-gray-900 border-b border-gray-200 pb-1 mb-3">6. Life Events &amp; Context</h2>
+              <h2 className="text-lg font-bold text-gray-900 border-b border-gray-200 pb-1 mb-3">7. Life Events &amp; Context</h2>
               <div className="space-y-2">
                 {data.lifeEvents.map((e, i) => (
                   <div key={i} className="text-sm flex gap-3">
@@ -336,10 +366,10 @@ export default function ReportPage() {
             </section>
           )}
 
-          {/* 7. AI Clinical Summary */}
+          {/* 8. AI Clinical Summary */}
           {insights && (
             <section>
-              <h2 className="text-lg font-bold text-gray-900 border-b border-gray-200 pb-1 mb-3">7. AI-Generated Clinical Summary</h2>
+              <h2 className="text-lg font-bold text-gray-900 border-b border-gray-200 pb-1 mb-3">8. AI-Generated Clinical Summary</h2>
               <div className="prose prose-sm max-w-none text-gray-700 whitespace-pre-wrap leading-relaxed">
                 {insights}
               </div>

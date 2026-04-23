@@ -156,7 +156,7 @@ async function getRegressionAnalysis(targetKey: string, days: number) {
   const [entries, symptoms, medications] = await Promise.all([
     prisma.logEntry.findMany({
       where: { entryDate: { gte: since } },
-      include: { symptomScores: true, biometrics: true, periodLog: true },
+      include: { symptomScores: true, biometrics: true, periodLog: true, prnMedLogs: true },
       orderBy: { entryDate: 'asc' },
     }),
     prisma.symptomDefinition.findMany({ where: { isActive: true }, orderBy: { sortOrder: 'asc' } }),
@@ -214,6 +214,18 @@ async function getRegressionAnalysis(targetKey: string, days: number) {
         return activePeriod.startDate <= d && (!activePeriod.endDate || activePeriod.endDate >= d) ? 1 : 0
       }),
     })
+  }
+
+  // PRN medication flags
+  const prnNames = ['Xanax', 'Acetaminophen', 'Ibuprofen']
+  for (const name of prnNames) {
+    const values = entries.map(e => {
+      const logs = (e as typeof e & { prnMedLogs: { medName: string; taken: boolean }[] }).prnMedLogs
+      return logs.some(m => m.medName === name && m.taken) ? 1 : 0
+    })
+    if (values.some(v => v > 0)) {
+      predictors.push({ key: `prn_${name.toLowerCase()}`, name: `${name} taken`, values })
+    }
   }
 
   const result = multipleLinearRegression(y, predictors)

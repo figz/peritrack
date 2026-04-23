@@ -29,6 +29,11 @@ interface LifeEventMarker {
   category: string
 }
 
+interface PrnMedEvent {
+  date: string
+  meds: string[]
+}
+
 const COLORS = [
   '#e11d48', '#7c3aed', '#0891b2', '#16a34a', '#ca8a04',
   '#9333ea', '#ea580c', '#0d9488', '#be185d', '#1d4ed8',
@@ -40,12 +45,14 @@ export function SymptomTrendChart({
   symptomDefs,
   medicationChanges,
   lifeEvents,
+  prnMedEvents = [],
 }: {
   data: DataPoint[]
   selectedSymptoms: string[]
   symptomDefs: SymptomDef[]
   medicationChanges: MedChange[]
   lifeEvents: LifeEventMarker[]
+  prnMedEvents?: PrnMedEvent[]
 }) {
   const chartData = data.map((d) => ({
     date: d.date,
@@ -113,6 +120,16 @@ export function SymptomTrendChart({
               />
             ))}
 
+            {prnMedEvents.map((pe, i) => (
+              <ReferenceLine
+                key={`prn-${i}`}
+                x={pe.date}
+                stroke="#16a34a"
+                strokeDasharray="3 3"
+                label={{ value: '💊', position: 'top', fontSize: 10 }}
+              />
+            ))}
+
             {selectedSymptoms.map((key, i) => (
               <Line
                 key={key}
@@ -131,6 +148,7 @@ export function SymptomTrendChart({
         <span className="flex items-center gap-1"><span className="w-4 h-3 bg-rose-100 border border-rose-200 rounded inline-block" /> Period days</span>
         <span className="flex items-center gap-1"><span className="inline-block w-4 border-t-2 border-dashed border-purple-600" /> Med change</span>
         <span className="flex items-center gap-1"><span className="text-yellow-600">★</span> Life event</span>
+        <span className="flex items-center gap-1"><span className="text-green-600">💊</span> PRN med taken</span>
       </div>
     </div>
   )

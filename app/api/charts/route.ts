@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
   const [entries, medications, events] = await Promise.all([
     prisma.logEntry.findMany({
       where: { entryDate: { gte: fromDate, lte: toDate } },
-      include: { symptomScores: true, sideEffectScores: true, periodLog: true, biometrics: true },
+      include: { symptomScores: true, sideEffectScores: true, periodLog: true, biometrics: true, prnMedLogs: true },
       orderBy: { entryDate: 'asc' },
     }),
     prisma.medicationPeriod.findMany({
@@ -43,12 +43,13 @@ export async function GET(req: NextRequest) {
     flowSeverity: number | null
     biometrics: Record<string, number>
     totalBurden: number
+    prnMeds: string[]
   }> = {}
 
   for (const entry of entries) {
     const dateKey = entry.entryDate.toISOString().split('T')[0]
     if (!dateMap[dateKey]) {
-      dateMap[dateKey] = { date: dateKey, symptoms: {}, sideEffects: {}, weight: null, periodPresent: false, flowSeverity: null, biometrics: {}, totalBurden: 0 }
+      dateMap[dateKey] = { date: dateKey, symptoms: {}, sideEffects: {}, weight: null, periodPresent: false, flowSeverity: null, biometrics: {}, totalBurden: 0, prnMeds: [] }
     }
     const day = dateMap[dateKey]
 
@@ -69,6 +70,9 @@ export async function GET(req: NextRequest) {
       if (b.metricValue) day.biometrics[b.metricKey] = Number(b.metricValue)
     }
     day.totalBurden = Object.values(day.symptoms).reduce((a, b) => a + b, 0)
+    for (const m of (entry as typeof entry & { prnMedLogs: { medName: string; taken: boolean }[] }).prnMedLogs) {
+      if (m.taken && !day.prnMeds.includes(m.medName)) day.prnMeds.push(m.medName)
+    }
   }
 
   return NextResponse.json({
@@ -83,5 +87,8 @@ export async function GET(req: NextRequest) {
       title: e.title,
       category: e.category,
     })),
+    prnMedEvents: Object.values(dateMap)
+      .filter(d => d.prnMeds.length > 0)
+      .map(d => ({ date: d.date, meds: d.prnMeds })),
   })
 }

@@ -26,6 +26,7 @@ interface ChartData {
   }[]
   medicationChanges: { date: string; name: string; dose: string | null }[]
   lifeEvents: { date: string; title: string; category: string }[]
+  prnMedEvents: { date: string; meds: string[] }[]
 }
 
 interface SymptomDef {
@@ -130,6 +131,7 @@ export default function ChartsPage() {
                   symptomDefs={symptoms}
                   medicationChanges={chartData.medicationChanges}
                   lifeEvents={chartData.lifeEvents}
+                  prnMedEvents={chartData.prnMedEvents}
                 />
               </CardContent>
             </Card>
