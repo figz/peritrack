@@ -139,7 +139,7 @@ Note any symptoms that are improving or areas of progress.
 Keep the language accessible to a non-clinician but precise enough to be medically useful. Do not diagnose or recommend treatment changes.`
 
   const genAI = new GoogleGenerativeAI(apiKey)
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
+  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
   const result = await model.generateContent(prompt)
   const content = result.response.text()
 
