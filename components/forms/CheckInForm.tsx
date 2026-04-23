@@ -100,12 +100,12 @@ function CategorySection({
   )
 }
 
-const PRN_MEDS = ['Xanax', 'Tylenol', 'Ibuprofen'] as const
+const PRN_MEDS = ['Xanax', 'Acetaminophen', 'Ibuprofen'] as const
 type PrnMedName = typeof PRN_MEDS[number]
 interface PrnMedEntry { taken: boolean; dose: string; reason: string }
 const DEFAULT_PRN_MEDS: Record<PrnMedName, PrnMedEntry> = {
   Xanax: { taken: false, dose: '', reason: '' },
-  Tylenol: { taken: false, dose: '', reason: '' },
+  Acetaminophen: { taken: false, dose: '', reason: '' },
   Ibuprofen: { taken: false, dose: '', reason: '' },
 }
 
