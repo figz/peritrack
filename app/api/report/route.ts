@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
   const days = parseInt(searchParams.get('days') ?? '90')
   const since = subDays(new Date(), days)
 
-  const [entries, symptoms, sideEffectDefs, medications, lifeEvents] = await Promise.all([
+  const [entries, symptoms, sideEffectDefs, medications, lifeEvents, labResults] = await Promise.all([
     prisma.logEntry.findMany({
       where: { entryDate: { gte: since } },
       include: { symptomScores: true, sideEffectScores: true, periodLog: true, biometrics: true, prnMedLogs: true },
@@ -26,6 +26,7 @@ export async function GET(req: NextRequest) {
       orderBy: [{ isActive: 'desc' }, { createdAt: 'asc' }],
     }),
     prisma.lifeEvent.findMany({ where: { eventDate: { gte: since } }, orderBy: { eventDate: 'asc' } }),
+    prisma.labResult.findMany({ where: { testDate: { gte: since } }, orderBy: [{ testDate: 'desc' }, { testName: 'asc' }] }),
   ])
 
   // Symptom stats
@@ -134,6 +135,18 @@ export async function GET(req: NextRequest) {
     weight: { points: weightPoints, trend: weightTrend },
     biometrics: biometricStats,
     prnMeds: prnStats,
+    labResults: labResults.map(r => ({
+      testDate: r.testDate.toISOString().slice(0, 10),
+      testName: r.testName,
+      testKey: r.testKey,
+      value: Number(r.value),
+      unit: r.unit,
+      refRangeLow: r.refRangeLow != null ? Number(r.refRangeLow) : null,
+      refRangeHigh: r.refRangeHigh != null ? Number(r.refRangeHigh) : null,
+      labName: r.labName,
+      panelName: r.panelName,
+      notes: r.notes,
+    })),
     lifeEvents: lifeEvents.map(e => ({
       date: e.eventDate.toISOString().slice(0, 10),
       category: e.category,

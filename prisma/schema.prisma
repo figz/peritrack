@@ -153,6 +153,23 @@ model LifeEvent {
   @@map("life_events")
 }
 
+model LabResult {
+  id           String   @id @default(uuid())
+  testDate     DateTime @db.Date @map("test_date")
+  testName     String   @map("test_name") @db.VarChar(128)
+  testKey      String?  @map("test_key") @db.VarChar(64)
+  value        Decimal  @db.Decimal(10, 3)
+  unit         String   @db.VarChar(32)
+  refRangeLow  Decimal? @db.Decimal(10, 3) @map("ref_range_low")
+  refRangeHigh Decimal? @db.Decimal(10, 3) @map("ref_range_high")
+  labName      String?  @map("lab_name") @db.VarChar(128)
+  panelName    String?  @map("panel_name") @db.VarChar(128)
+  notes        String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("lab_results")
+}
+
 model SymptomDefinition {
   key       String  @id @db.VarChar(64)
   label     String  @db.VarChar(128)

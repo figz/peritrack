@@ -5,6 +5,7 @@ import { format } from 'date-fns'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Printer, Loader2, Brain } from 'lucide-react'
+import { labStatus } from '@/lib/labTests'
 
 interface ReportData {
   reportDate: string
@@ -17,6 +18,7 @@ interface ReportData {
   weight: { points: { date: string; value: number }[]; trend: { slope: number; startWeight: number; endWeight: number; change: number } | null }
   biometrics: ({ key: string; label: string; unit: string; avg: number; count: number } | null)[]
   prnMeds: { name: string; daysTaken: number; totalDays: number; topReasons: string[]; doses: string[] }[]
+  labResults: { testDate: string; testName: string; testKey: string | null; value: number; unit: string; refRangeLow: number | null; refRangeHigh: number | null; labName: string | null; panelName: string | null; notes: string | null }[]
   lifeEvents: { date: string; category: string; title: string; description: string | null }[]
 }
 
@@ -318,10 +320,54 @@ export default function ReportPage() {
             )}
           </section>
 
-          {/* 6. As-Needed Medications */}
+          {/* 6. Lab Results */}
+          {data.labResults.length > 0 && (
+            <section>
+              <h2 className="text-lg font-bold text-gray-900 border-b border-gray-200 pb-1 mb-3">6. Lab Results</h2>
+              <p className="text-xs text-gray-500 mb-3">Bloodwork results during this report period, most recent first.</p>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="text-left py-2 px-3 font-semibold text-gray-700">Date</th>
+                    <th className="text-left py-2 px-3 font-semibold text-gray-700">Test</th>
+                    <th className="text-center py-2 px-3 font-semibold text-gray-700">Result</th>
+                    <th className="text-center py-2 px-3 font-semibold text-gray-700">Reference Range</th>
+                    <th className="text-center py-2 px-3 font-semibold text-gray-700">Status</th>
+                    <th className="text-left py-2 px-3 font-semibold text-gray-700">Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.labResults.map((r, i) => {
+                    const status = labStatus(r.value, r.refRangeLow, r.refRangeHigh)
+                    return (
+                      <tr key={i} className={`${i % 2 === 0 ? '' : 'bg-gray-50'} ${status !== 'normal' && status !== 'unknown' ? 'font-medium' : ''}`}>
+                        <td className="py-2 px-3 text-gray-500 text-xs whitespace-nowrap">{d(r.testDate)}</td>
+                        <td className="py-2 px-3 text-gray-800">{r.testName}</td>
+                        <td className="py-2 px-3 text-center font-bold">
+                          {r.value} <span className="font-normal text-xs text-gray-500">{r.unit}</span>
+                        </td>
+                        <td className="py-2 px-3 text-center text-xs text-gray-500">
+                          {r.refRangeLow != null || r.refRangeHigh != null ? `${r.refRangeLow ?? '?'} – ${r.refRangeHigh ?? '?'}` : '—'}
+                        </td>
+                        <td className="py-2 px-3 text-center">
+                          {status === 'low' && <span className="text-blue-700 text-xs font-semibold">↓ Low</span>}
+                          {status === 'high' && <span className="text-red-600 text-xs font-semibold">↑ High</span>}
+                          {status === 'normal' && <span className="text-green-700 text-xs">Normal</span>}
+                          {status === 'unknown' && <span className="text-gray-400 text-xs">—</span>}
+                        </td>
+                        <td className="py-2 px-3 text-xs text-gray-500">{r.notes ?? ''}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </section>
+          )}
+
+          {/* 7. As-Needed Medications */}
           {data.prnMeds.length > 0 && (
             <section>
-              <h2 className="text-lg font-bold text-gray-900 border-b border-gray-200 pb-1 mb-3">6. As-Needed Medications</h2>
+              <h2 className="text-lg font-bold text-gray-900 border-b border-gray-200 pb-1 mb-3">7. As-Needed Medications</h2>
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50">
@@ -347,10 +393,10 @@ export default function ReportPage() {
             </section>
           )}
 
-          {/* 7. Life Events */}
+          {/* 8. Life Events */}
           {data.lifeEvents.length > 0 && (
             <section>
-              <h2 className="text-lg font-bold text-gray-900 border-b border-gray-200 pb-1 mb-3">7. Life Events &amp; Context</h2>
+              <h2 className="text-lg font-bold text-gray-900 border-b border-gray-200 pb-1 mb-3">8. Life Events &amp; Context</h2>
               <div className="space-y-2">
                 {data.lifeEvents.map((e, i) => (
                   <div key={i} className="text-sm flex gap-3">
@@ -366,10 +412,10 @@ export default function ReportPage() {
             </section>
           )}
 
-          {/* 8. AI Clinical Summary */}
+          {/* 9. AI Clinical Summary */}
           {insights && (
             <section>
-              <h2 className="text-lg font-bold text-gray-900 border-b border-gray-200 pb-1 mb-3">8. AI-Generated Clinical Summary</h2>
+              <h2 className="text-lg font-bold text-gray-900 border-b border-gray-200 pb-1 mb-3">9. AI-Generated Clinical Summary</h2>
               <div className="prose prose-sm max-w-none text-gray-700 whitespace-pre-wrap leading-relaxed">
                 {insights}
               </div>

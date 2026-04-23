@@ -12,6 +12,8 @@ import { BurdenBarChart } from '@/components/charts/BurdenBarChart'
 import { WeightTrendChart } from '@/components/charts/WeightTrendChart'
 import { PeriodCalendar } from '@/components/charts/PeriodCalendar'
 import { BiometricsChart } from '@/components/charts/BiometricsChart'
+import { LabTrendChart } from '@/components/charts/LabTrendChart'
+import { KNOWN_LAB_TESTS } from '@/lib/labTests'
 
 interface ChartData {
   data: {
@@ -44,6 +46,8 @@ export default function ChartsPage() {
   const [symptoms, setSymptoms] = useState<SymptomDef[]>([])
   const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
+  const [labResults, setLabResults] = useState<{ id: string; testDate: string; testName: string; testKey: string | null; value: number; unit: string; refRangeLow: number | null; refRangeHigh: number | null }[]>([])
+  const [selectedLabKeys, setSelectedLabKeys] = useState<string[]>(['estradiol', 'fsh'])
 
   useEffect(() => {
     fetch('/api/settings').then((r) => r.json()).then(({ symptoms: s }) => {
@@ -62,6 +66,10 @@ export default function ChartsPage() {
       .then((d) => { setChartData(d); setLoading(false) })
       .catch(() => setLoading(false))
   }, [days, selectedSymptoms])
+
+  useEffect(() => {
+    fetch('/api/labs').then(r => r.json()).then(setLabResults).catch(() => {})
+  }, [])
 
   function toggleSymptom(key: string) {
     setSelectedSymptoms((s) => s.includes(key) ? s.filter((k) => k !== key) : [...s, key])
@@ -119,6 +127,7 @@ export default function ChartsPage() {
             <TabsTrigger value="weight">Weight</TabsTrigger>
             <TabsTrigger value="period">Period Calendar</TabsTrigger>
             <TabsTrigger value="biometrics">Biometrics</TabsTrigger>
+            <TabsTrigger value="labs">Lab Trends</TabsTrigger>
           </TabsList>
 
           <TabsContent value="trend" className="mt-4">
@@ -180,6 +189,38 @@ export default function ChartsPage() {
                 <BiometricsChart data={chartData.data} />
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="labs" className="mt-4 space-y-4">
+            {labResults.length === 0 ? (
+              <Card><CardContent className="text-center py-12 text-gray-400">No lab results recorded yet. Add results on the Lab Results page.</CardContent></Card>
+            ) : (
+              <>
+                <Card>
+                  <CardContent className="pt-4">
+                    <p className="text-xs text-gray-500 mb-2">Select tests to chart:</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {KNOWN_LAB_TESTS.filter(t => t.key !== 'other' && labResults.some(r => r.testKey === t.key)).map(t => (
+                        <button
+                          key={t.key}
+                          type="button"
+                          onClick={() => setSelectedLabKeys(prev => prev.includes(t.key) ? prev.filter(k => k !== t.key) : [...prev, t.key])}
+                          className={`px-2.5 py-1 rounded-full text-xs font-medium min-h-[32px] transition-colors ${selectedLabKeys.includes(t.key) ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                        >
+                          {t.name}
+                        </button>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardHeader><CardTitle className="text-base">Lab Value Trends Over Time</CardTitle></CardHeader>
+                  <CardContent>
+                    <LabTrendChart results={labResults} selectedKeys={selectedLabKeys} />
+                  </CardContent>
+                </Card>
+              </>
+            )}
           </TabsContent>
         </Tabs>
       )}

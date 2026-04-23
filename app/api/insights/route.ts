@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
 
   const since = subDays(new Date(), days)
 
-  const [entries, symptoms, sideEffectDefs, medications, lifeEvents] = await Promise.all([
+  const [entries, symptoms, sideEffectDefs, medications, lifeEvents, labResults] = await Promise.all([
     prisma.logEntry.findMany({
       where: { entryDate: { gte: since } },
       include: { symptomScores: true, sideEffectScores: true, periodLog: true, biometrics: true },
@@ -28,6 +28,7 @@ export async function POST(req: NextRequest) {
     prisma.sideEffectDefinition.findMany({ where: { isActive: true } }),
     prisma.medication.findMany({ include: { periods: { orderBy: { startDate: 'desc' } } } }),
     prisma.lifeEvent.findMany({ where: { eventDate: { gte: since } }, orderBy: { eventDate: 'asc' } }),
+    prisma.labResult.findMany({ orderBy: [{ testDate: 'desc' }, { testName: 'asc' }], take: 50 }),
   ])
 
   if (entries.length < 3) {
@@ -98,6 +99,20 @@ ${weightEntries.length >= 2 ? `- Start: ${weightEntries[0].weight} lbs (${weight
 
 ### Life Events
 ${lifeEvents.length ? lifeEvents.map(e => `- ${e.eventDate.toISOString().slice(0,10)} [${e.category}]: ${e.title}`).join('\n') : 'None recorded'}
+
+### Lab Results (most recent values per test)
+${labResults.length ? (() => {
+  const seen = new Set<string>()
+  return labResults
+    .filter(r => { const k = r.testName; if (seen.has(k)) return false; seen.add(k); return true })
+    .map(r => {
+      const val = `${r.testName}: ${Number(r.value)} ${r.unit} (${r.testDate.toISOString().slice(0,10)})`
+      const ref = r.refRangeLow != null || r.refRangeHigh != null ? ` [ref: ${r.refRangeLow ?? '?'}–${r.refRangeHigh ?? '?'}]` : ''
+      const status = r.refRangeLow != null && Number(r.value) < Number(r.refRangeLow) ? ' ← BELOW RANGE'
+        : r.refRangeHigh != null && Number(r.value) > Number(r.refRangeHigh) ? ' ← ABOVE RANGE' : ''
+      return `- ${val}${ref}${status}`
+    }).join('\n')
+})() : 'None recorded'}
 
 ---
 
